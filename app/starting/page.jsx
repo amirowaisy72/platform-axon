@@ -91,7 +91,7 @@ export default function StartingPage() {
                 <LucideIcons.Zap className="h-6 w-6 text-[#2d3e2f]" />
               </div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-[#a3d65c] to-[#b8e986] bg-clip-text text-transparent tracking-wide">
-                YourBrand
+                Axon
               </h1>
             </Link>
             <div className="flex items-center gap-3 relative">

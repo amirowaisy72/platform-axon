@@ -254,7 +254,7 @@ export default function RecordsPage() {
             <div className="w-10 h-10 rounded-xl bg-[#a3d65c] flex items-center justify-center">
               <LucideIcons.Zap className="h-6 w-6 text-[#1a2617]" />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-wide">YourBrand</h1>
+            <h1 className="text-2xl font-bold text-white tracking-wide">Axon</h1>
           </Link>
           <div className="flex items-center gap-3 relative">
             <Button

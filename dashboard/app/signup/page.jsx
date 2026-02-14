@@ -154,7 +154,7 @@ export default function SignupPage() {
                 <LucideIcons.Zap className="h-7 w-7 text-white" />
               </div>
               <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                YourBrand
+                Axon
               </h2>
             </div>
             <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-green-100 rounded-full">

@@ -7,7 +7,7 @@ const geist = Geist({ subsets: ["latin"] })
 const geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "YourBrand - Premium Platform",
+  title: "Axon - Premium Platform",
   description: "Your premium digital services platform",
 }
 
