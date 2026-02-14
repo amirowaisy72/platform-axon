@@ -15,7 +15,7 @@ export function DashboardProvider({ children }) {
 
   const host1offline = "http://localhost:3001/"
   const host2offline = "http://localhost:8000/"
-  const host1online = "https://platform-backend-pi.vercel.app/"
+  const host1online = "https://platform-axon-backend.vercel.app/"
   const host2online = "https://known-emmaline-axon-1-26d7c97e.koyeb.app/"
 
   useEffect(() => {

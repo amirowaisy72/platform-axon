@@ -1,6 +1,6 @@
 const mongoose = require("mongoose")
 
-const MONGO_URI = "mongodb+srv://goku012:0121452goku@cluster0.53byfkj.mongodb.net/mission"
+const MONGO_URI = "mongodb+srv://goku012:0121452goku@cluster0.53byfkj.mongodb.net/mission-axon"
 
 const connectDB = async () => {
   try {
