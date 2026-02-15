@@ -236,13 +236,14 @@ export default function LiveChat() {
                         {users.map((user) => (
                             <div
                                 key={user.id}
-                                className={`relative group p-3 rounded-xl cursor-pointer transition-all ${selectedUser?.id === user.id
-                                        ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-500/50"
-                                        : "bg-slate-800/40 hover:bg-slate-800/60 border-2 border-transparent"
+                                className={`group p-3 rounded-xl cursor-pointer transition-all ${selectedUser?.id === user.id
+                                    ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-500/50"
+                                    : "bg-slate-800/40 hover:bg-slate-800/60 border-2 border-transparent"
                                     }`}
                                 onClick={() => setSelectedUser(user)}
                             >
                                 <div className="flex items-start gap-3">
+                                    {/* Avatar */}
                                     <div className="relative">
                                         <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
                                             {user.username.charAt(0)}
@@ -253,27 +254,35 @@ export default function LiveChat() {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* User Info */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between">
                                             <h3 className="font-semibold text-slate-100 truncate">{user.username}</h3>
                                             <span className="text-xs text-slate-400">{formatTime(user.timestamp)}</span>
                                         </div>
+
                                         <p className="text-xs text-slate-400 truncate mt-1">{user.lastMessage}</p>
                                         <p className="text-xs text-slate-500 mt-1">ID: {user.id}</p>
+
+                                        {/* ✅ End Chat Button below the content */}
+                                        <div className="mt-2">
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                className="h-7 px-2 text-xs bg-red-600 hover:bg-red-700 transition-colors"
+                                                onClick={(e) => handleKillChat(user.id, e)}
+                                            >
+                                                <LucideIcons.Trash2 className="h-3 w-3 mr-1" />
+                                                End Chat
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    className="absolute top-2 right-2 h-7 px-2 text-xs bg-red-600 hover:bg-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => handleKillChat(user.id, e)}
-                                >
-                                    <LucideIcons.Trash2 className="h-3 w-3 mr-1" />
-                                    End
-                                </Button>
                             </div>
                         ))}
                     </div>
+
                 </ScrollArea>
             </Card>
 
@@ -338,8 +347,8 @@ export default function LiveChat() {
 
                                             <div
                                                 className={`px-4 py-2 rounded-2xl ${isUser
-                                                        ? "bg-slate-800 text-slate-100"
-                                                        : "bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
+                                                    ? "bg-slate-800 text-slate-100"
+                                                    : "bg-gradient-to-r from-cyan-500 to-blue-500 text-white"
                                                     }`}
                                             >
                                                 {msg.fileType === "image" && msg.fileUrl && (

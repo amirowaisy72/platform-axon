@@ -132,6 +132,16 @@ export default function UsersManagement() {
     setCurrentPage(page)
   }
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount || 0);
+  };
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -179,116 +189,202 @@ export default function UsersManagement() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-slate-800/60 border-b border-slate-700">
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">Username</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">Referal Name</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">Phone</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">VIP Level</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">Tasks</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">Wallet Balance</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">Total Balance</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">Salary</th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">Commission</th>
-                    <th className="px-6 py-4 text-center text-sm font-bold text-slate-200">Actions</th>
-                  </tr>
-                </thead>
+            <div className="w-full">
+              <div className="overflow-x-auto md:overflow-visible">
+                <table className="w-full text-sm text-slate-300">
 
-                <tbody>
-                  {users.length > 0 ? (
-                    users.map((user) => (
-                      <tr
-                        key={user._id}
-                        className="border-b border-slate-700/30 hover:bg-slate-700/30 transition-colors"
-                      >
-                        <td className="px-6 py-4 font-semibold text-slate-200">{user.username}</td>
-                        <td className="px-6 py-4 font-semibold text-slate-200">{user.ReferralName}</td>
-                        <td className="px-6 py-4 text-slate-400">{user.phone}</td>
-                        <td className="px-6 py-4">
-                          <span className="px-3 py-1 bg-purple-900/40 text-purple-300 rounded-full text-sm font-semibold border border-purple-700/50">
-                            {user.currentVIPLevel?.name
-                              ? `VIP${user.currentVIPLevel.number} ${user.currentVIPLevel.name}`
-                              : "Not Set"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-green-400">{getTaskCount(user)}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRefreshTasks(user._id)}
-                              disabled={refreshingTasks[user._id]}
-                              className="h-6 w-6 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded-md"
-                              title="Refresh tasks count"
-                            >
-                              {refreshingTasks[user._id] ? (
-                                <LucideIcons.Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <LucideIcons.RefreshCw className="h-3 w-3" />
-                              )}
-                            </Button>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-semibold text-green-400">${user.walletBalance}</td>
-                        <td className="px-6 py-4 font-semibold text-blue-400">{user.totalBalance}</td>
-                        <td className="px-6 py-4 font-semibold text-blue-400">{user.salary}</td>
-                        <td className="px-6 py-4 font-semibold text-blue-400">${user.commissionTotal}</td>
+                  {/* ✅ Header (Hidden on Mobile) */}
+                  <thead className="hidden md:table-header-group">
+                    <tr className="bg-slate-800/60 border-b border-slate-700">
 
-                        <td className="px-6 py-4 text-center flex justify-center gap-2">
-                          <Button
-                            onClick={() => handleOpenReward(user)}
-                            variant="ghost"
-                            size="icon"
-                            className="text-yellow-400 hover:bg-yellow-900/20 hover:text-yellow-300 rounded-lg"
-                            title="Random Reward"
-                          >
-                            <LucideIcons.Gift className="h-4 w-4" />
-                          </Button>
+                      <th className="px-4 py-4 text-center text-sm font-bold text-slate-200">
+                        Actions
+                      </th>
 
-                          <Button
-                            onClick={() => handleViewTasks(user)}
-                            variant="ghost"
-                            size="icon"
-                            className="text-yellow-400 hover:bg-yellow-900/20 hover:text-yellow-300 rounded-lg"
-                            title={`View Tasks (${user.activeSetTasks?.length || 0})`}
-                          >
-                            <LucideIcons.CheckCircle className="h-4 w-4" />
-                          </Button>
+                      <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">
+                        Tasks
+                      </th>
 
-                          <Button
-                            onClick={() => handleOpenActions(user)}
-                            variant="ghost"
-                            size="icon"
-                            className="text-purple-400 hover:bg-purple-900/20 hover:text-purple-300 rounded-lg"
-                            title="User Actions"
-                          >
-                            <LucideIcons.Settings className="h-4 w-4" />
-                          </Button>
+                      <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">
+                        User Details
+                      </th>
 
-                          <Button
-                            onClick={() => deleteUser(user._id)}
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-400 hover:bg-red-900/20 hover:text-red-300 rounded-lg"
-                          >
-                            <LucideIcons.Trash2 className="h-4 w-4" />
-                          </Button>
+                      <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">
+                        Financial Overview
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-sm font-bold text-slate-200">
+                        VIP Level
+                      </th>
+
+                    </tr>
+                  </thead>
+
+                  <tbody className="flex flex-col gap-4 md:table-row-group">
+
+                    {users.length > 0 ? (
+                      users.map((user) => (
+                        <tr
+                          key={user._id}
+                          className="flex flex-col md:table-row 
+                         bg-slate-900 md:bg-transparent
+                         rounded-xl md:rounded-none
+                         border border-slate-700/40 md:border-b md:border-slate-700/30
+                         p-4 md:p-0
+                         hover:bg-slate-800/40 transition-all duration-200"
+                        >
+
+                          {/* ✅ Actions */}
+                          <td className="md:px-4 md:py-4">
+                            <div className="flex flex-wrap justify-start md:justify-center gap-2 mb-4 md:mb-0">
+
+                              <Button
+                                onClick={() => handleOpenReward(user)}
+                                variant="ghost"
+                                size="icon"
+                                className="text-yellow-400 hover:bg-yellow-900/20 hover:text-yellow-300 rounded-lg"
+                                title="Random Reward"
+                              >
+                                <LucideIcons.Gift className="h-4 w-4" />
+                              </Button>
+
+                              <Button
+                                onClick={() => handleViewTasks(user)}
+                                variant="ghost"
+                                size="icon"
+                                className="text-green-400 hover:bg-green-900/20 hover:text-green-300 rounded-lg"
+                                title={`View Tasks (${user.activeSetTasks?.length || 0})`}
+                              >
+                                <LucideIcons.CheckCircle className="h-4 w-4" />
+                              </Button>
+
+                              <Button
+                                onClick={() => handleOpenActions(user)}
+                                variant="ghost"
+                                size="icon"
+                                className="text-purple-400 hover:bg-purple-900/20 hover:text-purple-300 rounded-lg"
+                                title="User Actions"
+                              >
+                                <LucideIcons.Settings className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+
+                          {/* ✅ Tasks */}
+                          <td className="md:px-6 md:py-4 mb-4 md:mb-0">
+                            <div className="flex items-center justify-between md:justify-start gap-3">
+
+                              <div className="flex flex-col">
+                                <span className="text-xs text-slate-400 md:hidden">
+                                  Active Tasks
+                                </span>
+                                <span className="text-lg font-bold text-green-400">
+                                  {getTaskCount(user)}
+                                </span>
+                              </div>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRefreshTasks(user._id)}
+                                disabled={refreshingTasks[user._id]}
+                                className="h-7 w-7 text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 rounded-md"
+                                title="Refresh tasks count"
+                              >
+                                {refreshingTasks[user._id] ? (
+                                  <LucideIcons.Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <LucideIcons.RefreshCw className="h-4 w-4" />
+                                )}
+                              </Button>
+
+                            </div>
+                          </td>
+
+                          {/* ✅ User Info */}
+                          <td className="md:px-6 md:py-4 mb-4 md:mb-0">
+                            <div className="space-y-1">
+                              <div className="text-xs text-slate-400 md:hidden">
+                                User Details
+                              </div>
+
+                              <div className="font-semibold text-slate-200 text-base">
+                                {user.username}
+                              </div>
+
+                              <div className="text-sm text-slate-400">
+                                Referral: {user.ReferralName || "N/A"}
+                              </div>
+
+                              <div className="text-sm text-slate-500">
+                                Phone: {user.phone}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* ✅ Financial Info */}
+                          <td className="md:px-6 md:py-4 mb-4 md:mb-0">
+                            <div>
+                              <div className="text-xs text-slate-400 md:hidden mb-2">
+                                Financial Overview
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+
+                                <div className="text-slate-400">Wallet</div>
+                                <div className="text-green-400 font-semibold text-right">
+                                  {formatCurrency(user.walletBalance)}
+                                </div>
+
+                                <div className="text-slate-400">Total</div>
+                                <div className="text-blue-400 font-semibold text-right">
+                                  {formatCurrency(user.totalBalance)}
+                                </div>
+
+                                <div className="text-slate-400">Commission</div>
+                                <div className="text-purple-400 font-semibold text-right">
+                                  {formatCurrency(user.commissionTotal)}
+                                </div>
+
+                                <div className="text-slate-400">Salary</div>
+                                <div className="text-indigo-400 font-semibold text-right">
+                                  {formatCurrency(user.salary)}
+                                </div>
+
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* ✅ VIP */}
+                          <td className="md:px-6 md:py-4">
+                            <div className="text-xs text-slate-400 md:hidden mb-1">
+                              VIP Level
+                            </div>
+
+                            <span className="px-3 py-1 bg-gradient-to-r from-purple-800/40 to-indigo-800/40 
+                                 text-purple-300 rounded-full text-xs font-semibold 
+                                 border border-purple-600/40">
+                              {user.currentVIPLevel?.name
+                                ? `VIP ${user.currentVIPLevel.number} - ${user.currentVIPLevel.name}`
+                                : "Not Assigned"}
+                            </span>
+                          </td>
+
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="text-center py-10 text-slate-400 font-semibold">
+                          No users found
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="8" className="text-center py-10 text-slate-400 font-semibold">
-                        No users found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+
+                  </tbody>
+                </table>
+              </div>
             </div>
+
 
             <div className="flex justify-center py-4 gap-3">
               <Button
