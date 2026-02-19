@@ -35,12 +35,40 @@ const Index = ({ user, setShowTaskSubmissionDialog, setTask, starting, setStarti
     return newArr
   }
 
+  const isWithinEasternWorkingHours = () => {
+    const now = new Date()
+
+    // Convert current time to America/New_York timezone
+    const easternTimeString = now.toLocaleString("en-US", {
+      timeZone: "America/New_York",
+    })
+
+    const easternTime = new Date(easternTimeString)
+
+    const hours = easternTime.getHours()
+    const minutes = easternTime.getMinutes()
+
+    const totalMinutes = hours * 60 + minutes
+
+    const startMinutes = 9 * 60 + 30   // 09:30 AM
+    const endMinutes = 21 * 60 + 30    // 09:30 PM
+
+    return totalMinutes >= startMinutes && totalMinutes <= endMinutes
+  }
+
   const handleStartOptimization = async () => {
     if (!user?._id) return
 
+    // ✅ Working hours check
+    if (!isWithinEasternWorkingHours()) {
+      setCSMessage("Platform working hours are from 09:30AM to 09:30PM Eastern Time")
+      setShowCSModal(true)
+      return
+    }
+
     if (user.walletBalance < 0) {
       setShowCSModal(true)
-      setCSMessage("Please contact the live support to")
+      setCSMessage("Please contact the live support")
       setStarting(false)
       return
     }
