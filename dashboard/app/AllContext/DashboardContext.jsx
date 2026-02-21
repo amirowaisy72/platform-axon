@@ -16,7 +16,7 @@ export function DashboardProvider({ children }) {
   const host1offline = "http://localhost:3001/"
   const host2offline = "http://localhost:8000/"
   const host1online = "https://platform-axon-backend.vercel.app/"
-  const host2online = "https://platform-axon-realtime-server.fly.dev/"
+  const host2online = "https://platform-axon-live-server.onrender.com/"
 
   useEffect(() => {
     const eventSource = new EventSource(`${host2online}api/realtime-events`);
