@@ -6,7 +6,6 @@ const startUsersWatcher = require("./watchers/users.watcher")
 const startTransactionsWatcher = require("./watchers/transactions.watcher")
 
 const app = express()
-const PORT = 8000
 
 connectDB()
 
@@ -24,6 +23,9 @@ app.use("/api/liveSupport", require("./routes/liveSupport"))
 startUsersWatcher()
 startTransactionsWatcher()
 
-app.listen(PORT, () => {
-  console.log(`🚀 Realtime server running on port ${PORT}`)
-})
+const PORT = process.env.PORT || 8000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Realtime server running on port ${PORT}`);
+});
+
