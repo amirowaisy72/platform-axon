@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import * as LucideIcons from "lucide-react"
 import { useLiveSupportContext } from "@/app/AllContext/ChatContext"
 
-export default function CS({ userId, username }) {
+export default function CS({ message = "How can we help you today? Choose your preferred contact method.", userId, username }) {
   const { setIsChatOpen, connectSSE, fetchChatHistory } = useLiveSupportContext()
 
   const handleOpenChat = async () => {
@@ -22,23 +22,21 @@ export default function CS({ userId, username }) {
       onClick: handleOpenChat,
     },
     {
-      name: "Email Support",
-      icon: "Mail",
-      description: "support@Axon.com",
-    },
-    {
-      name: "Phone Support",
-      icon: "Phone",
-      description: "+1 (555) 123-4567",
+      name: "WhatsApp",
+      icon: "MessageSquare", // or use a relevant icon from LucideIcons
+      description: "+1 206-845-1783",
+      onClick: () => {
+        window.open("https://wa.me/12068451783", "_blank")
+      },
     },
   ]
 
   return (
     <DialogContent className="bg-[#2d3e2f] border-[#3d4f3f] text-white max-w-md">
       <DialogHeader>
-        <DialogTitle className="text-2xl font-bold text-[#a3d65c]">Customer Service</DialogTitle>
+        <DialogTitle className="text-2xl font-bold text-[#a3d65c]">Online Support</DialogTitle>
         <DialogDescription className="text-gray-300">
-          How can we help you today? Choose your preferred contact method.
+          {message}
         </DialogDescription>
       </DialogHeader>
 
@@ -71,7 +69,7 @@ export default function CS({ userId, username }) {
       <div className="pt-4 border-t border-[#3d4f3f]">
         <p className="text-sm text-gray-400 text-center">
           <LucideIcons.Clock className="h-4 w-4 inline mr-1" />
-          Available 24/7 for your support
+          Available from 09:30AM to 09:30 PM Eastern Time for your support.
         </p>
       </div>
     </DialogContent>

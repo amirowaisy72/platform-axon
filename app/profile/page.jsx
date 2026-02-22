@@ -17,7 +17,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const fileInputRef = useRef(null)
 
-  const [storedUser, setStoredUser] = useState("")
+  const [storedUser, setStoredUser] = useState(null)
   const [profilePhotoLink, setProfilePhotoLink] = useState("")
   const [loggingout, setLoggingout] = useState(false)
   const [user, setUser] = useState({
@@ -29,6 +29,7 @@ export default function ProfilePage() {
     commission: null,
     joinDate: null,
     creditScore: null,
+    notifications: null,
   })
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function ProfilePage() {
         commission: userData.commissionTotal,
         joinDate: joinDate,
         creditScore: userData.creditScore,
+        notifications: userData.notifications
       })
 
       setProfilePhotoLink(userData.profile?.photoLink || "")
@@ -463,11 +465,51 @@ export default function ProfilePage() {
               </Button>
             </div>
             <div className="space-y-3">
-              {notifications.map((notification, index) => (
-                <div key={index} className="p-4 bg-[#2d3e2f]/50 rounded-2xl border border-[#a3d65c]/20 text-gray-200">
-                  {notification}
-                </div>
-              ))}
+              {user.notifications.length > 0 ? (
+                <ul className="space-y-3">
+                  {user.notifications.map((notification, index) => {
+                    // Optional: style based on notification type
+                    let bgColor = "bg-[#2d3e2f]/50 border-[#3d4e3f]"; // default
+                    let textColor = "text-gray-300";
+
+                    switch (notification.type) {
+                      case "success":
+                        bgColor = "bg-green-600/20 border-green-500";
+                        textColor = "text-green-400";
+                        break;
+                      case "warning":
+                        bgColor = "bg-yellow-600/20 border-yellow-500";
+                        textColor = "text-yellow-400";
+                        break;
+                      case "error":
+                        bgColor = "bg-red-600/20 border-red-500";
+                        textColor = "text-red-400";
+                        break;
+                      case "info":
+                      default:
+                        bgColor = "bg-[#2d3e2f]/50 border-[#3d4e3f]";
+                        textColor = "text-gray-300";
+                        break;
+                    }
+
+                    return (
+                      <li
+                        key={index}
+                        className={`text-sm p-3 rounded-xl ${bgColor} border hover:bg-[#2d3e2f] transition-all duration-200 ${textColor}`}
+                      >
+                        <p>{notification.message}</p>
+                        <p className="text-xs opacity-50 mt-1">
+                          {new Date(notification.createdAt).toLocaleString()}
+                        </p>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p className="text-gray-400 text-sm text-center py-4">
+                  No new notifications.
+                </p>
+              )}
             </div>
           </div>
         )}
