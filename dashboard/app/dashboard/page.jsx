@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,37 @@ function DashboardContent() {
 
   // Count of users with pending messages
   const { messages, users } = useChatContext() // assuming your context provides users/messages
+
+  // Audio ref for notification sound
+  const audioRef = useRef(null)
+
+  // Initialize audio ONLY once properly
+  useEffect(() => {
+    audioRef.current = new Audio("/notification-sound.mp3")
+    audioRef.current.loop = true
+    audioRef.current.volume = 0.3
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+    }
+  }, [])
+
+  // Play / pause sound based on pendingUsersCount
+  useEffect(() => {
+    if (!audioRef.current) return
+
+    if (pendingUsersCount > 0) {
+      audioRef.current.play().catch(err => {
+        console.log("Audio play failed:", err)
+      })
+    } else {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
+  }, [pendingUsersCount])
 
   useEffect(() => {
     if (users) {

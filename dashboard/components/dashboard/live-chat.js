@@ -185,38 +185,6 @@ export default function LiveChat() {
 
     const totalPendingMessages = users.reduce((sum, u) => sum + u.pendingMessages, 0)
 
-    // Logic to play notification sound when there is unread message
-    const audioRef = useRef(null);
-
-    // Sound notification useEffect
-    useEffect(() => {
-        if (!audioRef.current) {
-            // Initialize Audio object only once
-            audioRef.current = new Audio("/notification-sound.mp3"); // apni sound file ka path
-            audioRef.current.loop = true; // jab tak condition true, sound loop me chale
-        }
-
-        if (totalPendingMessages > 0) {
-            // Play sound if there are pending messages
-            audioRef.current.play().catch((err) => {
-                console.log("Cannot autoplay sound:", err);
-            });
-        } else {
-            // Stop and reset sound if no pending messages
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-        }
-
-        // Cleanup on component unmount
-        return () => {
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.currentTime = 0;
-            }
-        };
-    }, [totalPendingMessages]);
-    // Logic to play notification sound when there is unread message END
-    
     return (
         <div className="h-[calc(100vh-12rem)] flex gap-4">
             {lightboxImage && (
