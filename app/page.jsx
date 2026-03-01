@@ -213,7 +213,7 @@ export default function HomePage() {
           <section className="w-full py-12 bg-[#3a4a3c]">
             <div className="max-w-7xl mx-auto px-4 md:px-6">
               <h2 className="text-3xl font-bold text-center mb-8 text-white">
-                Our <span className="text-lime-400">Services</span>
+                Premium <span className="text-lime-400">Dashboard</span>
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6">
                 {navTabs.map((tab) => {

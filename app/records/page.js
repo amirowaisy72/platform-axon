@@ -257,48 +257,12 @@ export default function RecordsPage() {
             <h1 className="text-2xl font-bold text-white tracking-wide">Axon</h1>
           </Link>
           <div className="flex items-center gap-3 relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative text-gray-300 hover:text-[#a3d65c] transition-colors rounded-xl hover:bg-[#3a4d3c]"
-            >
-              <LucideIcons.Bell className="h-6 w-6" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-red-500 to-pink-500 rounded-full animate-pulse"></div>
-            </Button>
             <Link
               href="/profile"
               className="text-gray-300 hover:text-[#a3d65c] transition-colors rounded-xl hover:bg-[#3a4d3c] p-2"
             >
               <LucideIcons.UserCircle className="h-6 w-6" />
             </Link>
-
-            {showNotifications && (
-              <Card className="absolute top-full right-0 mt-3 w-80 bg-[#3a4d3c]/95 backdrop-blur-xl border border-[#4a5d4c] shadow-2xl rounded-2xl z-50 overflow-hidden">
-                <div className="bg-[#a3d65c] p-4">
-                  <h3 className="text-lg font-bold text-[#1a2617] flex items-center gap-2">
-                    <LucideIcons.Bell className="h-5 w-5" />
-                    Notifications
-                  </h3>
-                </div>
-                <div className="p-4">
-                  {notifications.length > 0 ? (
-                    <ul className="space-y-3">
-                      {notifications.map((notification, index) => (
-                        <li
-                          key={index}
-                          className="text-sm text-gray-200 p-3 rounded-xl bg-[#2d3e2f] border border-[#4a5d4c] hover:shadow-md transition-all duration-200"
-                        >
-                          {notification}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-gray-400 text-sm text-center py-4">No new notifications.</p>
-                  )}
-                </div>
-              </Card>
-            )}
           </div>
         </div>
       </header>
