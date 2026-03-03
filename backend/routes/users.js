@@ -491,8 +491,8 @@ router.get("/getTaskForUser/:userId/:taskNo", async (req, res) => {
     const selectedProduct = availableProducts[randomIndex].toObject();
 
     // Random value between 50% to 60% of totalBalance
-    const minValue = user.totalBalance * 0.47;
-    const maxValue = user.totalBalance * 0.57;
+    const minValue = user.totalBalance * 0.50;
+    const maxValue = user.totalBalance * 0.60;
     const randomValue = Number((Math.random() * (maxValue - minValue) + minValue).toFixed(2));
 
     // Assign value to productValue
