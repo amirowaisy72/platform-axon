@@ -31,7 +31,7 @@ const Index = () => {
         const vipLevel = user?.currentVIPLevel?.number || 1
 
         const withdrawalLimits = {
-            1: 1300,
+            1: 1000,
             2: 4000,
             3: 8000,
             4: Infinity, // unlimited
