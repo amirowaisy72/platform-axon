@@ -35,7 +35,7 @@ export default function CertificatePage() {
             <h2 className="text-3xl font-bold text-white mb-6">Official Company Certificate</h2>
             <div className="relative w-full max-w-2xl h-[300px] md:h-[400px] lg:h-[500px] overflow-hidden rounded-2xl border-2 border-[#a3d65c] shadow-2xl bg-[#2d3e2f]/50 backdrop-blur-sm">
               <Image
-                src="/placeholder.svg?height=500&width=800&text=Official+Company+Certificate"
+                src="/certificate.webp"
                 alt="Official Company Certificate"
                 layout="fill"
                 objectFit="contain"

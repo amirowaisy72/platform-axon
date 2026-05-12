@@ -31,28 +31,28 @@ export default function HomePage() {
     { name: "Deposit", iconName: "CreditCard", href: "/deposit", color: "from-lime-500 to-lime-600" },
     { name: "T & C", iconName: "FileText", href: "/terms-and-conditions", color: "from-lime-500 to-lime-600" },
     { name: "Certificate", iconName: "Award", href: "/certificate", color: "from-lime-500 to-lime-600" },
-    { name: "FAQs", target: "_blank", iconName: "HelpCircle", href: "https://faqaxon.netlify.app/", color: "from-lime-500 to-lime-600" },
+    // { name: "FAQs", target: "_blank", iconName: "HelpCircle", href: "https://faqaxon.netlify.app/", color: "from-lime-500 to-lime-600" },
     { name: "About", iconName: "Info", href: "/about", color: "from-lime-500 to-lime-600" },
   ]
 
   const vipLevels = [
     {
       level: "VIP1",
-      amount: "100.00 USD",
+      amount: "1000.00 USD",
       iconName: "Star",
       color: "from-lime-500 to-lime-600",
       bgColor: "bg-gradient-to-br from-lime-900/20 to-lime-800/20",
     },
     {
       level: "VIP2",
-      amount: "500.00 USD",
+      amount: "2000.00 USD",
       iconName: "Crown",
       color: "from-lime-500 to-lime-600",
       bgColor: "bg-gradient-to-br from-lime-900/20 to-lime-800/20",
     },
     {
       level: "VIP3",
-      amount: "1500.00 USD",
+      amount: "3000.00 USD",
       iconName: "Gem",
       color: "from-lime-500 to-lime-600",
       bgColor: "bg-gradient-to-br from-lime-900/20 to-lime-800/20",
@@ -378,7 +378,7 @@ export default function HomePage() {
                   <div className="w-16 h-16 bg-lime-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <LucideIcons.Users className="h-8 w-8 text-[#2d3e2f]" />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">09:30 AM to 09:30 PM EST</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">08:00 AM to 08:00 PM EST</h3>
                   <p className="text-gray-300">Round-the-clock customer support team</p>
                 </div>
               </div>

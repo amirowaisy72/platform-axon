@@ -24,7 +24,7 @@ export default function CS({ message = "How can we help you today? Choose your p
     {
       name: "WhatsApp",
       icon: "MessageSquare", // or use a relevant icon from LucideIcons
-      description: "+1 206-845-1783",
+      description: "+1 781-961-7200",
       onClick: () => {
         window.open("https://wa.me/12068451783", "_blank")
       },
