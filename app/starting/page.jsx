@@ -11,10 +11,13 @@ import { useUsersContext } from "../AllContext/UsersContext"
 import Optimization from "./Optimization/Index"
 import Bottom from "@/app/Common/Bottom/Bottom"
 import SupportChat from '@/app/Common/SupportChat/SupportChat'
+import NotificationPopup from "@/app/Common/Notifications/NotificationPopup"
+import { fetchAdminSettings, DEFAULT_SETTINGS, workingHoursText } from "@/lib/admin-settings"
 
 export default function StartingPage() {
   const router = useRouter()
-  const { user } = useUsersContext()
+  const { user, setUser } = useUsersContext()
+  const [popupNotification, setPopupNotification] = useState(null)
 
   const [userDetails, setUserDetails] = useState(null)
   const [walletBalance, setWalletBalance] = useState(0)
@@ -22,6 +25,45 @@ export default function StartingPage() {
   const [profilePhotoLink, setProfilePhotoLink] = useState("")
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+
+  // Unread = backend read flag. The bell dot shows ONLY when this is > 0.
+  const unreadCount = (user?.notifications || []).filter((n) => !n.read).length
+
+  const markNotificationsRead = () => {
+    if (!user || unreadCount === 0) return
+    const updated = { ...user, notifications: (user.notifications || []).map((n) => ({ ...n, read: true })) }
+    setUser(updated)
+    try { localStorage.setItem("user", JSON.stringify(updated)) } catch (e) {}
+    fetch(`https://platform-axon-rust.vercel.app/api/users/markNotificationsRead/${user._id}`, { method: "POST" }).catch(() => {})
+  }
+
+  const handleBellClick = () => {
+    const opening = !showNotifications
+    setShowNotifications(opening)
+    if (opening) {
+      setPopupNotification(null)
+      markNotificationsRead()
+    }
+  }
+
+  // First-time popup: newest unread notification never shown before.
+  // Shared "shown" list with Home, so it pops only once across pages.
+  // Dismissing is NOT reading; only opening the dropdown clears the dot.
+  useEffect(() => {
+    if (!user?.notifications?.length || showNotifications || popupNotification) return
+    try {
+      const shown = new Set(JSON.parse(localStorage.getItem("axon-shown-notification-ids") || "[]"))
+      const fresh = [...user.notifications].reverse().find((n) => !n.read && !shown.has(n._id || `${n.message}-${n.createdAt}`))
+      if (!fresh) return
+      const key = fresh._id || `${fresh.message}-${fresh.createdAt}`
+      shown.add(key)
+      localStorage.setItem("axon-shown-notification-ids", JSON.stringify([...shown]))
+      const timer = setTimeout(() => setPopupNotification(fresh), 600)
+      return () => clearTimeout(timer)
+    } catch (e) { /* ignore */ }
+  }, [user, showNotifications, popupNotification])
+  const [workingHours, setWorkingHours] = useState(DEFAULT_SETTINGS.workingHours)
+  useEffect(() => { fetchAdminSettings().then((s) => setWorkingHours(s.workingHours || DEFAULT_SETTINGS.workingHours)) }, [])
 
   const fileInputRef = useRef(null)
 
@@ -53,25 +95,32 @@ export default function StartingPage() {
     "💎 Don't miss out on our special VIP offers!",
   ]
 
+  // Profile picture via Cloudinary (Req 8), same as the profile page:
+  // upload through the backend and save only the Cloudinary URL.
   const handleProfileImageUpload = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     const reader = new FileReader()
-    reader.onloadend = () => {
-      const base64 = reader.result
-
+    reader.onloadend = async () => {
       const stored = localStorage.getItem("user")
       if (!stored) return
-
       const parsed = JSON.parse(stored)
-      parsed.profile = parsed.profile || {}
-      parsed.profile.photoLink = base64
-
-      localStorage.setItem("user", JSON.stringify(parsed))
-      setProfilePhotoLink(base64)
+      try {
+        const response = await fetch("https://platform-axon-rust.vercel.app/api/users/uploadProfileImage/" + parsed._id, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: reader.result }),
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || "Upload failed")
+        parsed.profile = parsed.profile || {}
+        parsed.profile.photoLink = result.photoLink
+        localStorage.setItem("user", JSON.stringify(parsed))
+        setProfilePhotoLink(result.photoLink)
+      } catch (error) {
+        alert(error.message || "Failed to upload profile picture. Ask an admin to configure Cloudinary in Admin Settings.")
+      }
     }
-
     reader.readAsDataURL(file)
   }
 
@@ -84,7 +133,6 @@ export default function StartingPage() {
 
   return (
     <>
-    <SupportChat userId={user._id} username={user.username} />
       <div className="flex flex-col min-h-screen bg-gradient-to-br from-[#2d3e2f] via-[#3d4f3f] to-[#2d3e2f]">
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#2d3e2f]/95 border-b border-[#a3d65c]/20 shadow-lg">
           <div className="flex items-center justify-between p-4">
@@ -100,17 +148,21 @@ export default function StartingPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={handleBellClick}
+                title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}` : "Notifications"}
                 className="relative text-white hover:text-[#a3d65c] transition-colors rounded-xl hover:bg-[#3d4f3f]"
               >
                 <LucideIcons.Bell className="h-6 w-6" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-[#a3d65c] to-[#b8e986] rounded-full animate-pulse"></div>
+                {unreadCount > 0 && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-[#a3d65c] to-[#b8e986] rounded-full animate-pulse"></div>
+                )}
               </Button>
 
 
               <SupportChat
                 userId={user._id}
                 username={user.username}
+                renderPanel={false}
                 renderTrigger={({ unseenCount, openChat }) => (
                   <button
                     onClick={openChat}
@@ -128,19 +180,27 @@ export default function StartingPage() {
               />
               <Link
                 href="/profile"
-                className="text-white hover:text-[#a3d65c] transition-colors rounded-xl hover:bg-[#3d4f3f] p-2"
+                className="text-white hover:text-[#a3d65c] transition-colors rounded-xl hover:bg-[#3d4f3f] p-1"
+                title="Profile"
               >
-                <LucideIcons.UserCircle className="h-6 w-6" />
+                {(profilePhotoLink || (user.profile?.photoLink && user.profile.photoLink !== "none" ? user.profile.photoLink : "") || (user.profileimage && user.profileimage !== "none" ? user.profileimage : "")) ? (
+                  <img src={profilePhotoLink || user.profile?.photoLink || user.profileimage} alt={user.username} className="w-8 h-8 rounded-full object-cover border border-[#a3d65c]/50" />
+                ) : (
+                  <LucideIcons.UserCircle className="h-6 w-6" />
+                )}
               </Link>
 
               {/* 🔽 Notification Dropdown */}
               {showNotifications && (
                 <Card className="absolute top-full right-0 mt-3 w-80 bg-[#3d4e3f]/95 backdrop-blur-xl border border-[#4d5e4f] shadow-2xl rounded-2xl z-50 overflow-hidden">
-                  <div className="bg-lime-500 p-4">
+                  <div className="bg-lime-500 p-4 flex items-center justify-between">
                     <h3 className="text-lg font-bold text-[#2d3e2f] flex items-center gap-2">
                       <LucideIcons.Bell className="h-5 w-5" />
                       Notifications
                     </h3>
+                    <span className="text-xs font-bold text-[#2d3e2f]/70">
+                      {unreadCount > 0 ? `${unreadCount} unread` : "All read"}
+                    </span>
                   </div>
                   <div className="p-4">
                     {user.notifications.length > 0 ? (
@@ -172,10 +232,13 @@ export default function StartingPage() {
 
                           return (
                             <li
-                              key={index}
+                              key={notification._id || index}
                               className={`text-sm p-3 rounded-xl ${bgColor} border hover:bg-[#2d3e2f] transition-all duration-200 ${textColor}`}
                             >
-                              <p>{notification.message}</p>
+                              <p className="flex items-start gap-2">
+                                {!notification.read && <span className="mt-1.5 w-2 h-2 bg-lime-400 rounded-full shrink-0" title="Unread" />}
+                                <span className={!notification.read ? "font-semibold text-white" : ""}>{notification.message}</span>
+                              </p>
                               <p className="text-xs opacity-50 mt-1">
                                 {new Date(notification.createdAt).toLocaleString()}
                               </p>
@@ -361,7 +424,7 @@ export default function StartingPage() {
                   </div>
                   <div>
                     <span className="font-semibold text-white">Online Support Hours</span>
-                    <p className="text-gray-300">09:30 - 21:30 Estern Time (Daily)</p>
+                    <p className="text-gray-300">{workingHoursText(workingHours)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-[#2d3e2f] rounded-2xl border border-[#a3d65c]/20">
@@ -380,6 +443,14 @@ export default function StartingPage() {
 
         <Bottom />
       </div>
+      {popupNotification && !showNotifications && (
+        <NotificationPopup
+          notification={popupNotification}
+          unreadCount={unreadCount}
+          onView={handleBellClick}
+          onDismiss={() => setPopupNotification(null)}
+        />
+      )}
     </>
   )
 }

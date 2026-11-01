@@ -14,7 +14,7 @@ import {
 import * as LucideIcons from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import SupportChat from '@/app/Common/SupportChat/SupportChat'
+import { fetchAdminSettings, DEFAULT_SETTINGS } from "@/lib/admin-settings"
 import CS from "@/app/Common/CustomerService/CS"
 
 export default function VipLevelsPage() {
@@ -32,7 +32,7 @@ export default function VipLevelsPage() {
     }
   }, [])
 
-  const allVipLevels = [
+  const defaultVipLevels = [
     {
       level: "VIP1",
       name: "Bronze Tier",
@@ -98,6 +98,29 @@ export default function VipLevelsPage() {
     },
   ]
 
+  const [allVipLevels, setAllVipLevels] = useState(defaultVipLevels)
+  useEffect(() => {
+    fetchAdminSettings().then((s) => {
+      const configured = (s.vipLevels || []).filter((v) => v.visible !== false)
+      if (configured.length > 0) {
+        setAllVipLevels(configured.map((v) => ({
+          level: v.level,
+          name: v.name,
+          amount: v.amount || `${Number(v.depositRequired || 0).toLocaleString()}.00 USD`,
+          iconName: v.iconName || "Star",
+          depositRequired: v.depositRequired,
+          color: "from-[#a3d65c] to-[#8bc34a]",
+          bgColor: "from-[#3a4d3c] to-[#2d3e2f]",
+          borderColor: "border-[#a3d65c]",
+          commission: v.commission,
+          withdrawalLimit: v.withdrawalLimit,
+          features: v.features || [],
+          badge: v.badge,
+        })))
+      }
+    })
+  }, [])
+
   const currentUserVipLevel = storedUser
     ? "VIP" + JSON.parse(localStorage.getItem("user")).currentVIPLevel.number
     : null
@@ -145,7 +168,6 @@ export default function VipLevelsPage() {
 
   return (
     <>
-      <SupportChat userId={storedUser._id} username={storedUser.username} />
       <div className="flex flex-col min-h-screen bg-[#2d3e2f]">
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#3a4d3c]/90 border-b border-[#a3d65c]/20 shadow-lg">
           <div className="flex items-center justify-between p-4">

@@ -311,7 +311,7 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-700 font-semibold">Invite Code (Optional)</Label>
+                <Label className="text-slate-700 font-semibold">Invite Code *</Label>
                 <div className="relative">
                   <LucideIcons.Gift className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
                   <Input

@@ -1,5 +1,7 @@
 import { LiveSupportProvider } from './AllContext/ChatContext';
+import GlobalSupportChat from './Common/SupportChat/GlobalSupportChat';
 import { UsersProvider } from './AllContext/UsersContext';
+import PresenceTracker from './Common/Presence/PresenceTracker';
 import './globals.css'
 
 export default function RootLayout({ children }) {
@@ -11,7 +13,7 @@ export default function RootLayout({ children }) {
         <title>Axon</title>
       </head>
       <body>
-        <UsersProvider><LiveSupportProvider>{children}</LiveSupportProvider></UsersProvider>
+        <UsersProvider><PresenceTracker /><LiveSupportProvider><GlobalSupportChat />{children}</LiveSupportProvider></UsersProvider>
       </body>
     </html>
   )

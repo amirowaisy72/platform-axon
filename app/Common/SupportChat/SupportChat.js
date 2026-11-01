@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import * as LucideIcons from "lucide-react"
@@ -8,13 +9,19 @@ import { cn } from "@/lib/utils"
 import { useLiveSupportContext } from "@/app/AllContext/ChatContext"
 import { optimizeImage, validateImageFile, getBase64Size } from "@/lib/image-optimizer"
 
-export default function Chatting({ userId, username, renderTrigger }) {
+export default function Chatting({ userId, username, renderTrigger, renderPanel = true }) {
+    const [portalMounted, setPortalMounted] = useState(false)
+    useEffect(() => { setPortalMounted(true) }, [])
     const [replyingTo, setReplyingTo] = useState(null)
     const [hoveredMessageId, setHoveredMessageId] = useState(null)
     const [isDragging, setIsDragging] = useState(false)
     const [lightboxImage, setLightboxImage] = useState(null)
     const [inputText, setInputText] = useState("")
     const [isOptimizing, setIsOptimizing] = useState(false)
+    const [isMinimized, setIsMinimized] = useState(false)
+    const [pendingImage, setPendingImage] = useState(null)
+    const [isNearBottom, setIsNearBottom] = useState(true)
+    const [hasNewMessageBelow, setHasNewMessageBelow] = useState(false)
     const [unseenCount, setUnseenCount] = useState(0)
     const textareaRef = useRef(null)
 
@@ -41,10 +48,19 @@ export default function Chatting({ userId, username, renderTrigger }) {
     } = useLiveSupportContext()
 
     useEffect(() => {
-        if (isChatOpen && textareaRef.current) {
-            textareaRef.current.focus()
+        if (isChatOpen) {
+            setIsMinimized(false)
+            if (textareaRef.current) textareaRef.current.focus()
         }
     }, [isChatOpen])
+
+    // Escape closes the chat, like every professional chat widget.
+    useEffect(() => {
+        if (!isChatOpen) return
+        const onKey = (e) => { if (e.key === "Escape") setIsChatOpen(false) }
+        window.addEventListener("keydown", onKey)
+        return () => window.removeEventListener("keydown", onKey)
+    }, [isChatOpen, setIsChatOpen])
 
     useEffect(() => {
         const handleGlobalKeyDown = (e) => {
@@ -96,9 +112,19 @@ export default function Chatting({ userId, username, renderTrigger }) {
         setFilteredMessages(filtered)
     }, [messages, userId])
 
+    const handleChatScroll = () => {
+        const el = chatContainerRef.current
+        if (!el) return
+        const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+        setIsNearBottom(near)
+        if (near) setHasNewMessageBelow(false)
+    }
     useEffect(() => {
-        if (isChatOpen && messagesEndRef.current) {
+        if (!isChatOpen) return
+        if (isNearBottom && messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+        } else if (filteredMessages.length) {
+            setHasNewMessageBelow(true)
         }
     }, [messages, isChatOpen])
 
@@ -143,20 +169,70 @@ export default function Chatting({ userId, username, renderTrigger }) {
     }
 
     const handleSendMessage = async () => {
-        if (inputText.trim() === "") return
+        if (inputText.trim() === "" && !pendingImage) return
 
         sendTypingStatus(userId, username, "user", false)
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
 
-        await sendMessage({
-            userId,
-            username,
-            sender: "user",
-            text: inputText,
-            replyTo: replyingTo ? replyingTo.id : null,
-        })
+        if (pendingImage) {
+            await sendMessage({
+                userId,
+                username,
+                sender: "user",
+                text: inputText,
+                fileUrl: pendingImage.dataUrl,
+                fileType: "image",
+                fileName: pendingImage.name,
+                replyTo: replyingTo ? replyingTo.id : null,
+            })
+            setPendingImage(null)
+        } else {
+            await sendMessage({
+                userId,
+                username,
+                sender: "user",
+                text: inputText,
+                replyTo: replyingTo ? replyingTo.id : null,
+            })
+        }
         setInputText("")
         setReplyingTo(null)
+        if (textareaRef.current) textareaRef.current.style.height = "auto"
+    }
+
+    // Clipboard paste: an image copied to the clipboard (e.g. screenshot,
+    // copied photo) loads into the message field as a preview when pasted
+    // into the composer, instead of being ignored. The user then presses
+    // Send to send it, optionally with a caption typed in the field.
+    const handlePaste = async (e) => {
+        const items = e.clipboardData?.items
+        if (!items) return
+        for (const item of items) {
+            if (item.type && item.type.startsWith("image/")) {
+                e.preventDefault()
+                const file = item.getAsFile()
+                if (!file) return
+                const validation = validateImageFile(file)
+                if (!validation.valid) { alert(validation.error); return }
+                setIsOptimizing(true)
+                try {
+                    const optimizedDataUrl = await optimizeImage(file, { maxWidth: 1920, maxHeight: 1080, quality: 0.75, format: "webp" })
+                    setPendingImage({ dataUrl: optimizedDataUrl, name: "pasted-image.webp" })
+                    if (textareaRef.current) textareaRef.current.focus()
+                } catch (err) {
+                    alert("Failed to load pasted image. Please try again.")
+                } finally {
+                    setIsOptimizing(false)
+                }
+                return
+            }
+        }
+    }
+
+    const handleTextareaInput = (e) => {
+        handleInputChange(e)
+        const el = textareaRef.current
+        if (el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 150) + "px" }
     }
 
     const handleImageUpload = async (file) => {
@@ -287,9 +363,11 @@ export default function Chatting({ userId, username, renderTrigger }) {
                 openChat: () => setIsChatOpen(true)
             })}
 
-            {isChatOpen && (
-                <div className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <Card className="w-full h-full bg-[#2d3e2f] border-none shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300">
+            {isChatOpen && renderPanel && portalMounted && createPortal((
+                <div className={`fixed inset-0 z-[9998] md:inset-auto md:bottom-6 md:right-6 md:w-[420px] ${isMinimized ? "md:h-auto" : "md:h-[620px] md:max-h-[85vh]"} flex md:block animate-in fade-in duration-200`}>
+                    {/* Mobile backdrop: tap outside to close. Desktop: floating panel, page stays usable. */}
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setIsChatOpen(false)} />
+                    <Card className="relative w-full h-full bg-[#2d3e2f] border-none md:rounded-3xl md:border md:border-lime-500/20 shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300">
                         {/* Header */}
                         <div className="flex items-center justify-between p-6 bg-gradient-to-r from-lime-500 to-lime-600 border-b border-lime-400/30">
                             <div className="flex items-center gap-4">
@@ -311,6 +389,15 @@ export default function Chatting({ userId, username, renderTrigger }) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
+                                    onClick={() => setIsMinimized((v) => !v)}
+                                    title={isMinimized ? "Restore chat" : "Minimize chat"}
+                                    className="text-[#2d3e2f] hover:bg-[#2d3e2f]/10 rounded-full transition-colors"
+                                >
+                                    <LucideIcons.Minus className="h-6 w-6" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => setIsChatOpen(false)}
                                     className="text-[#2d3e2f] hover:bg-[#2d3e2f]/10 rounded-full transition-colors"
                                 >
@@ -319,9 +406,12 @@ export default function Chatting({ userId, username, renderTrigger }) {
                             </div>
                         </div>
 
+                        {!isMinimized && (
+                        <>
                         {/* Messages Area */}
                         <div
                             ref={chatContainerRef}
+                            onScroll={handleChatScroll}
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                             onDrop={handleDrop}
@@ -350,6 +440,20 @@ export default function Chatting({ userId, username, renderTrigger }) {
                                 </div>
                             )}
 
+                            {filteredMessages.length === 0 && !isOptimizing && (
+                                <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
+                                    <div className="w-16 h-16 rounded-full bg-lime-500/20 flex items-center justify-center mb-4">
+                                        <LucideIcons.Headphones className="h-8 w-8 text-lime-400" />
+                                    </div>
+                                    <p className="text-white font-bold text-lg">How can we help?</p>
+                                    <p className="text-gray-400 text-sm mt-2 max-w-[260px]">Send a message below. You can also paste a screenshot or photo directly into the message field.</p>
+                                </div>
+                            )}
+                            {hasNewMessageBelow && (
+                                <div className="sticky bottom-2 z-10 flex justify-center">
+                                    <button onClick={() => { setHasNewMessageBelow(false); messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }) }} className="bg-lime-500 text-[#2d3e2f] text-xs font-bold px-4 py-2 rounded-full shadow-lg">↓ New messages</button>
+                                </div>
+                            )}
                             {filteredMessages.map((message, index) => {
                                 const showDate =
                                     index === 0 || formatDate(messages[index - 1].timestamp) !== formatDate(message.timestamp)
@@ -519,6 +623,18 @@ export default function Chatting({ userId, username, renderTrigger }) {
 
                         {/* Input Area */}
                         <div className="p-4 bg-[#2d3e2f] border-t border-[#3d4e3f]">
+                            {pendingImage && (
+                                <div className="mb-3 p-2 bg-[#3a4a3c] rounded-xl flex items-center gap-3">
+                                    <img src={pendingImage.dataUrl} alt="Pasted image preview" className="w-16 h-16 rounded-lg object-cover" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-200 font-medium">Pasted image ready to send</p>
+                                        <p className="text-xs text-gray-400">Add a caption if you like, then press Send.</p>
+                                    </div>
+                                    <Button size="icon" variant="ghost" onClick={() => setPendingImage(null)} className="h-8 w-8 text-gray-400 hover:text-lime-400 flex-shrink-0">
+                                        <LucideIcons.X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
                             {replyingTo && (
                                 <div className="mb-3 p-3 bg-[#3a4a3c] rounded-lg border-l-2 border-lime-400 flex justify-between items-center">
                                     <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -548,7 +664,7 @@ export default function Chatting({ userId, username, renderTrigger }) {
                                 </div>
                             )}
 
-                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:items-end">
+                            <div className="flex flex-row gap-2 w-full items-end">
                                 {/* Hidden Inputs */}
                                 <input
                                     ref={imageInputRef}
@@ -566,7 +682,7 @@ export default function Chatting({ userId, username, renderTrigger }) {
                                 />
 
                                 {/* Upload Buttons */}
-                                <div className="flex gap-2 sm:flex-col">
+                                <div className="flex gap-2 shrink-0">
                                     <Button
                                         size="icon"
                                         variant="ghost"
@@ -597,7 +713,8 @@ export default function Chatting({ userId, username, renderTrigger }) {
                                     <textarea
                                         ref={textareaRef}
                                         value={inputText}
-                                        onChange={handleInputChange}
+                                        onChange={handleTextareaInput}
+                                        onPaste={handlePaste}
                                         onKeyDown={(e) => {
                                             if (e.key === "Enter" && !e.shiftKey) {
                                                 e.preventDefault()
@@ -612,7 +729,7 @@ export default function Chatting({ userId, username, renderTrigger }) {
                                     {/* Send button inside textarea */}
                                     <Button
                                         onClick={handleSendMessage}
-                                        disabled={inputText.trim() === "" || isOptimizing}
+                                        disabled={(inputText.trim() === "" && !pendingImage) || isOptimizing}
                                         size="icon"
                                         className="absolute right-2 bottom-2 h-8 w-8 bg-lime-500 hover:bg-lime-600 text-[#2d3e2f] disabled:bg-gray-600 disabled:text-gray-400 rounded-full shadow-lg transition-all duration-200"
                                     >
@@ -622,12 +739,19 @@ export default function Chatting({ userId, username, renderTrigger }) {
                             </div>
 
                         </div>
+                        </>
+                        )}
+                        {isMinimized && (
+                            <div className="p-4 text-center">
+                                <button onClick={() => setIsMinimized(false)} className="text-lime-400 font-semibold hover:underline">Chat minimized — click to restore</button>
+                            </div>
+                        )}
                     </Card>
                 </div>
-            )}
+            ), document.body)}
 
             {/* Lightbox for images */}
-            {lightboxImage && (
+            {lightboxImage && renderPanel && portalMounted && createPortal((
                 <div
                     className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
                     onClick={() => setLightboxImage(null)}
@@ -648,7 +772,7 @@ export default function Chatting({ userId, username, renderTrigger }) {
                         />
                     </div>
                 </div>
-            )}
+            ), document.body)}
 
             <style jsx global>{`
         @keyframes highlight {

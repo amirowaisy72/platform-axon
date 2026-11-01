@@ -5,6 +5,15 @@ const Product = require("../models/Product");
 
 const uploadProductImage = async (image) => {
     try {
+        // Prefer admin-configured Cloudinary credentials (Admin Settings),
+        // so product uploads keep working after credentials move out of code.
+        try {
+          const AdminSettings = require("../models/AdminSettings");
+          const settings = await AdminSettings.findOne({ key: "global" }).lean();
+          if (settings?.cloudinary?.cloudName && settings?.cloudinary?.apiKey && settings?.cloudinary?.apiSecret) {
+            cloudinary.config({ cloud_name: settings.cloudinary.cloudName, api_key: settings.cloudinary.apiKey, api_secret: settings.cloudinary.apiSecret, secure: true });
+          }
+        } catch (e) { /* fall back to env-based config */ }
         // Upload new image to Cloudinary with transformations
         const uploadRes = await cloudinary.uploader.upload(image, {
             folder: "products",

@@ -8,6 +8,38 @@ const WalletAddress = require("../models/WalletAddress");
 const TransactionHistory = require("../models/TransactionHistory");
 const DepositWallet = require("../models/DepositWallet");
 
+// --- IP location (Req 9) -------------------------------------------------
+// Best-effort, non-blocking: a failed lookup never blocks signup/login.
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (forwarded) return String(forwarded).split(",")[0].trim();
+  return req.ip || "";
+}
+async function lookupIpLocation(ip) {
+  if (!ip || ip === "::1" || ip.startsWith("127.") || ip.startsWith("10.") || ip.startsWith("192.168.")) return null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,country,city,regionName,query`, { signal: controller.signal });
+    clearTimeout(timer);
+    const data = await res.json();
+    if (data && data.status === "success") {
+      return { ip: data.query || ip, country: data.country || "", city: data.city || "", region: data.regionName || "", updatedAt: new Date() };
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+async function attachIpLocation(req, user) {
+  try {
+    const ip = getClientIp(req);
+    if (!ip) return;
+    const location = await lookupIpLocation(ip);
+    if (location) { user.location = location; await user.save(); }
+    else if (!user.location?.ip) { user.location = { ip, country: "", city: "", region: "", updatedAt: new Date() }; await user.save(); }
+  } catch (e) { /* never block auth on location */ }
+}
+
+
 // Route to create a new user
 router.post("/createUser", async (req, res) => {
   try {
@@ -71,6 +103,7 @@ router.post("/createUser", async (req, res) => {
 
     await transaction.save();
 
+    attachIpLocation(req, newUser).catch(() => {});
     res.status(201).json({ message: "User created successfully", user: newUser });
   } catch (error) {
     console.error("Create user error:", error);
@@ -95,6 +128,7 @@ router.post("/login", async (req, res) => {
     }
 
     // 3️⃣ If credentials are valid, return user data
+    attachIpLocation(req, user).catch(() => {});
     res.status(200).json({
       message: "Login successful",
       user
@@ -112,13 +146,19 @@ router.get("/users", async (req, res) => {
     const limit = 20;
     const skip = (page - 1) * limit;
 
+    // Online-only filter (Users Management "users online now" click):
+    // same 2-minute heartbeat rule as /online, so the main list below
+    // shows exactly the online users, with full rows + pagination.
+    const onlineOnly = req.query.online === "true";
+    const filter = onlineOnly ? { lastSeenAt: { $gte: new Date(Date.now() - 2 * 60 * 1000) } } : {};
+
     // Fetch users with pagination
-    const users = await User.find()
+    const users = await User.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const total = await User.countDocuments();
+    const total = await User.countDocuments(filter);
 
     const usersWithExtras = await Promise.all(
       users.map(async (user) => {
@@ -163,7 +203,7 @@ router.get("/users", async (req, res) => {
 router.get("/search", async (req, res) => {
   try {
     const { query, page = 1 } = req.query;
-    const pageSize = 10;
+    const pageSize = 20; // Req 1: 20 accounts per page, same as the main users list
 
     const mongoQuery = {
       $or: [
@@ -248,6 +288,8 @@ router.put("/updateUser/:id", async (req, res) => {
       "notifications",
       "todayProfit",
       "creditScore",
+      "profile",
+      "location",
     ];
 
     allowedFields.forEach((field) => {
@@ -519,7 +561,7 @@ const generateTaskCode = () => {
 };
 
 // ✅ Save Task endpoint 
-router.post("/saveTask", async (req, res) => { 
+router.post("/saveTask", async (req, res) => {
   try {
     const { userId, orderType, combo, product, commission } = req.body;
 
@@ -1030,6 +1072,141 @@ router.get("/getUserByUserId/:userId", async (req, res) => {
   } catch (error) {
     console.error("Get user by userId error:", error);
     res.status(500).json({ error: "Server error. Please try again later." });
+  }
+});
+
+
+// Upload a profile picture to Cloudinary (Req 8).
+// Credentials come from admin settings (dashboard > Admin Settings >
+// Cloudinary) or CLOUDINARY_* environment variables. The image is stored
+// in Cloudinary, and only its URL is saved on the user, so the picture is
+// visible from any browser/device and in the admin panel.
+
+// Realtime presence: heartbeat from the main app. Uses findByIdAndUpdate
+// (not save) so the VIP pre-save hook does not run on every heartbeat.
+// If Realtime Events is OFF in Admin Settings, heartbeats are ignored.
+router.post("/presence/:id", async (req, res) => {
+  try {
+    const AdminSettings = require("../models/AdminSettings");
+    const settings = await AdminSettings.findOne({ key: "global" }).lean().catch(() => null);
+    if (settings && settings.realtimeEvents && settings.realtimeEvents.enabled === false) {
+      return res.json({ ok: false, realtimeEnabled: false });
+    }
+    const page = String(req.body?.page || "").slice(0, 100);
+    const activity = String(req.body?.activity || page || "").slice(0, 100);
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: { lastSeenAt: new Date(), currentPage: page, currentActivity: activity } },
+      { new: true, select: "_id username lastSeenAt currentPage currentActivity location" }
+    );
+    if (!user) return res.status(404).json({ error: "User not found" });
+    // Auto location: while the user is online, check if a location is
+    // saved. If not, or if the admin requested a fresh location, fetch it
+    // from the user's current IP and save it. Attempts are throttled to
+    // once per 6 hours when a lookup keeps failing, so a bad IP does not
+    // hammer the lookup service on every 45s heartbeat.
+    try {
+      const loc = user.location || {};
+      const updatedAt = loc.updatedAt ? new Date(loc.updatedAt).getTime() : 0;
+      const staleAttempt = !updatedAt || Date.now() - updatedAt > 6 * 60 * 60 * 1000;
+      const needsLocation = Boolean(loc.refreshRequested) || ((!loc.city && !loc.country) && staleAttempt);
+      if (needsLocation) {
+        const reqForIp = { headers: req.headers, ip: req.ip };
+        const lookedUp = await lookupIpLocation(getClientIp(reqForIp));
+        if (lookedUp) {
+          await User.findByIdAndUpdate(req.params.id, { $set: { location: { ...lookedUp, refreshRequested: false } } });
+        } else {
+          // Record the attempt so we do not retry on every heartbeat.
+          await User.findByIdAndUpdate(req.params.id, { $set: { "location.updatedAt": new Date(), "location.refreshRequested": false } });
+        }
+      }
+    } catch (e) { /* location must never break presence */ }
+    res.json({ ok: true, lastSeenAt: user.lastSeenAt });
+  } catch (error) {
+    console.error("Presence error:", error);
+    res.status(500).json({ error: "Failed to update presence" });
+  }
+});
+
+// Admin: request a fresh location for a user. Nothing is fetched here;
+// the next presence heartbeat (within ~45s if the user is online, or
+// the next time they come online) fetches it from their current IP.
+router.post("/requestLocationRefresh/:id", async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: { "location.refreshRequested": true } },
+      { new: true, select: "_id username location" }
+    );
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ ok: true, message: "Fresh location will be fetched on the next heartbeat / next time the user comes online." });
+  } catch (error) {
+    console.error("Request location refresh error:", error);
+    res.status(500).json({ error: "Failed to request location refresh" });
+  }
+});
+
+// Mark all notifications as read (header bell dot clears only when read).
+// Called when the user opens the notifications dropdown.
+router.post("/markNotificationsRead/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    let changed = false;
+    (user.notifications || []).forEach((n) => { if (!n.read) { n.read = true; changed = true; } });
+    if (changed) await user.save();
+    res.json({ ok: true, unreadCount: 0, user });
+  } catch (error) {
+    console.error("Mark notifications read error:", error);
+    res.status(500).json({ error: "Failed to mark notifications as read" });
+  }
+});
+
+router.get("/online", async (req, res) => {
+  try {
+    const since = new Date(Date.now() - 2 * 60 * 1000);
+    const onlineUsers = await User.find({ lastSeenAt: { $gte: since } })
+      .select("_id username currentVIPLevel profile lastSeenAt currentPage currentActivity location")
+      .sort({ lastSeenAt: -1 })
+      .lean();
+    res.json({ onlineUsers, count: onlineUsers.length });
+  } catch (error) {
+    console.error("Online users error:", error);
+    res.status(500).json({ error: "Failed to fetch online users" });
+  }
+});
+
+router.post("/uploadProfileImage/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const { image } = req.body || {};
+    if (!image) return res.status(400).json({ error: "No image provided" });
+
+    const AdminSettings = require("../models/AdminSettings");
+    const settings = await AdminSettings.findOne({ key: "global" }).lean().catch(() => null);
+    const cloudName = settings?.cloudinary?.cloudName || process.env.CLOUDINARY_CLOUD_NAME || "";
+    const apiKey = settings?.cloudinary?.apiKey || process.env.CLOUDINARY_API_KEY || "";
+    const apiSecret = settings?.cloudinary?.apiSecret || process.env.CLOUDINARY_API_SECRET || "";
+    if (!cloudName || !apiKey || !apiSecret) {
+      return res.status(400).json({ error: "Cloudinary is not configured. Ask an admin to add Cloudinary credentials in Admin Settings." });
+    }
+    const cloudinary = require("cloudinary").v2;
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true });
+    const result = await cloudinary.uploader.upload(image, { folder: "platform-axon/profile-pictures", resource_type: "image" });
+    user.profile = user.profile || {};
+    user.profile.photoLink = result.secure_url;
+    user.profileimage = result.secure_url;
+    await user.save();
+    res.json({ message: "Profile picture updated", photoLink: result.secure_url, user });
+  } catch (error) {
+    console.error("Upload profile image error:", error);
+    // Return the underlying reason (Cloudinary errors never contain the
+    // secret). Previously this was masked as a generic 500, which made a
+    // wrong Cloudinary key/secret impossible to diagnose from the browser.
+    const detail = error && error.message ? String(error.message) : "Failed to upload profile picture";
+    const status = error && error.http_code ? error.http_code : 500;
+    res.status(status >= 400 && status < 600 ? status : 500).json({ error: detail });
   }
 });
 

@@ -10,7 +10,7 @@ import { useUsersContext } from "../../app/AllContext/UsersContext"
 import { useDashboard } from "@/app/AllContext/DashboardContext"
 
 export default function UserTasks({ userId, onClose, userDetails }) {
-  const { fetchProducts, createCombo, getCombosByUser, updateCombo, deleteCombo, resetUserData } = useUsersContext()
+  const { fetchProducts, createCombo, getCombosByUser, updateCombo, deleteCombo, resetUserData, refreshTasksForToday, getCompletedSets } = useUsersContext()
   const { users, updateUserAPI } = useDashboard()
 
   const { toast } = useToast()
@@ -195,6 +195,25 @@ export default function UserTasks({ userId, onClose, userDetails }) {
       title: "Reset Complete",
       description: `Deleted ${result.combosDeleted} combos and ${result.tasksDeleted} tasks`,
     })
+  }
+
+  const [refreshingToday, setRefreshingToday] = useState(false)
+  const [completedSets, setCompletedSets] = useState({ today: 0, total: 0 })
+  useEffect(() => {
+    if (!userId) return
+    getCompletedSets(userId).then((r) => { if (r.success) setCompletedSets({ today: r.today, total: r.total }) })
+  }, [userId])
+  const handleRefreshToday = async () => {
+    if (!confirm("Refresh all tasks for today? This will start a new day for this user. Combos and tasks will be deleted, like Reset. If the user had a full completed set, it will be recorded first.")) return
+    setRefreshingToday(true)
+    const result = await refreshTasksForToday(userId)
+    setRefreshingToday(false)
+    if (!result.success) {
+      toast({ title: "Error", description: result.error || "Failed to refresh tasks for today.", variant: "destructive" })
+      return
+    }
+    toast({ title: "Tasks Refreshed for Today", description: result.completedSetRecorded ? "A completed set was recorded, then combos and tasks were refreshed for a new day." : "Combos and tasks were refreshed for a new day." })
+    getCompletedSets(userId).then((r) => { if (r.success) setCompletedSets({ today: r.today, total: r.total }) })
   }
 
   const handleRechargeTraining = async () => {
@@ -462,6 +481,19 @@ export default function UserTasks({ userId, onClose, userDetails }) {
                     )}
                   </div>
 
+                  <p className="text-sm text-slate-300">Sets Completed Today: <span className="font-bold text-white">{completedSets.today}</span></p>
+                  <Button
+                    onClick={handleRefreshToday}
+                    disabled={refreshingToday}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600"
+                  >
+                    {refreshingToday ? (
+                      <LucideIcons.Loader2 className="animate-spin mr-2" size={18} />
+                    ) : (
+                      <LucideIcons.RefreshCw className="mr-2" size={18} />
+                    )}
+                    Refresh All Sets of Tasks for Today
+                  </Button>
                   <Button
                     onClick={handleReset}
                     disabled={resetting}

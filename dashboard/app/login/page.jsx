@@ -40,6 +40,32 @@ export default function LoginPage() {
       return
     }
 
+    // Req 10: once an admin username/password is set via /admin-password,
+    // the panel requires exactly those credentials.
+    try {
+      const settingsRes = await fetch("https://platform-axon-rust.vercel.app/api/settings")
+      const settingsData = await settingsRes.json()
+      if (settingsData?.settings?.admin?.hasPassword) {
+        const loginRes = await fetch("https://platform-axon-rust.vercel.app/api/settings/admin-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: formData.username.trim(), password: formData.loginPassword }),
+        })
+        const loginData = await loginRes.json()
+        if (!loginData.ok) {
+          setError("Invalid admin username or password.")
+          setIsLoading(false)
+          return
+        }
+        localStorage.setItem("admin-auth", "1")
+        localStorage.setItem("user", JSON.stringify({ username: formData.username.trim() }))
+        router.push("/dashboard")
+        return
+      }
+    } catch (err) {
+      // If settings cannot be reached, fall through to the existing login.
+    }
+
     const result = await loginUser(formData)
     if (result.error) {
       setError(result.error)
@@ -162,14 +188,6 @@ export default function LoginPage() {
             </form>
           </Card>
 
-          <div className="text-center mt-6">
-            <p className="text-slate-600">
-              Don't have an account?{" "}
-              <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-bold">
-                Sign Up
-              </Link>
-            </p>
-          </div>
         </div>
       </main>
     </div>

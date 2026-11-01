@@ -12,8 +12,8 @@ export function UsersProvider({ children }) {
 
   const host1offline = "http://localhost:3001/"
   const host2offline = "http://localhost:8000/"
-  const host1online = "https://platform-axon-backend.vercel.app/"
-  const host2online = "https://platform-axon-live-server.onrender.com/"
+  const host1online = "https://platform-axon-rust.vercel.app/"
+  const host2online = "https://platform-axon-realtime.onrender.com/"
 
   useEffect(() => {
     const eventSource = new EventSource(`${host2online}api/realtime-events`);
@@ -223,6 +223,46 @@ export function UsersProvider({ children }) {
     } catch (error) {
       console.error("Reset User Data Error:", error);
       return { success: false, error: error.message };
+    }
+  };
+
+  // Refresh for today: records a full set first (if any), then deletes
+  // combos and tasks, like Reset. Starts a new day for the user.
+  const refreshTasksForToday = async (userId) => {
+    try {
+      const response = await fetch(`${host1online}api/combo/refresh-today/${userId}`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to refresh tasks for today");
+      return { success: true, ...data };
+    } catch (error) {
+      console.error("Refresh Tasks For Today Error:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Completed sets counts for one user (today = Eastern Time date).
+  const getCompletedSets = async (userId) => {
+    try {
+      const response = await fetch(`${host1online}api/combo/completed-sets/${userId}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to fetch completed sets");
+      return { success: true, today: data.today || 0, total: data.total || 0, date: data.date };
+    } catch (error) {
+      console.error("Completed Sets Error:", error);
+      return { success: false, today: 0, total: 0 };
+    }
+  };
+
+  // Completed sets summary for all users: { userId: { today, total } }.
+  const getCompletedSetsSummary = async () => {
+    try {
+      const response = await fetch(`${host1online}api/combo/completed-sets-summary`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to fetch completed sets summary");
+      return { success: true, summary: data.summary || {}, date: data.date };
+    } catch (error) {
+      console.error("Completed Sets Summary Error:", error);
+      return { success: false, summary: {} };
     }
   };
 
@@ -473,6 +513,9 @@ export function UsersProvider({ children }) {
         updateCombo,
         deleteCombo,
         resetUserData,
+        refreshTasksForToday,
+        getCompletedSets,
+        getCompletedSetsSummary,
         addWallet,
         getWallets,
         deleteWallet,

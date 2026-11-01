@@ -27,7 +27,7 @@ const Index = ({ user }) => {
             {/* Enhanced Product Optimization Section */}
             <Start setTasksState={setTasksState} tasksState={tasksState} setShowTaskSubmissionDialog={setShowTaskSubmissionDialog} user={user} setTask={setTask} starting={starting} setStarting={setStarting} />
 
-            {/* Enhanced Task Submission Dialog */}
+            {/* Enhanced Activity Submission Dialog */}
             <Submit setTasksState={setTasksState} task={task} setTask={setTask} showTaskSubmissionDialog={showTaskSubmissionDialog} setShowTaskSubmissionDialog={setShowTaskSubmissionDialog} user={user} setStarting={setStarting} />
         </>
     )

@@ -6,15 +6,31 @@ import * as LucideIcons from "lucide-react"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Card } from "@/components/ui/card"
 import { useUsersContext } from "@/app/AllContext/UsersContext"
+import { fetchAdminSettings } from "@/lib/admin-settings"
 
 const Index = () => {
   const { getWallets } = useUsersContext()
   const [wallets, setWallets] = useState([])
+  const [brandName, setBrandName] = useState("Axon")
 
   useEffect(() => {
     const fetchData = async () => {
       const data = await getWallets()
-      setWallets(data)
+      // Admin-saved crypto deposit addresses (Req 13) are shown here
+      // alongside the existing deposit wallets; duplicates by address
+      // are removed. If neither source has any, an empty state is shown.
+      const settings = await fetchAdminSettings()
+      setBrandName(settings.brandName || "Axon")
+      const adminAddresses = (settings.depositAddresses || [])
+        .filter((a) => a.visible !== false && a.walletAddress)
+        .map((a, i) => ({ _id: `admin-${i}`, walletName: a.walletName || a.label || "Crypto", walletAddress: a.walletAddress }))
+      const seen = new Set()
+      const merged = [...adminAddresses, ...(data || [])].filter((w) => {
+        if (seen.has(w.walletAddress)) return false
+        seen.add(w.walletAddress)
+        return true
+      })
+      setWallets(merged)
     }
     fetchData()
   }, [])
@@ -59,6 +75,9 @@ const Index = () => {
               <h2 className="text-lg sm:text-2xl font-bold text-white">Deposit Addresses</h2>
             </div>
 
+            {wallets.length === 0 && (
+              <p className="text-sm text-gray-300">No deposit addresses configured yet. Please contact support.</p>
+            )}
             <div className="grid gap-6 sm:gap-8 mb-8">
               {wallets.map((wallet) => {
                 const Icon = iconMapping[wallet.walletName] || LucideIcons.Wallet
@@ -106,7 +125,7 @@ const Index = () => {
                       <div className="flex gap-2 sm:gap-3">
                         <LucideIcons.AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 mt-0.5 text-[#a3d65c]" />
                         <p className="text-xs sm:text-sm text-gray-300">
-                          Send funds to the address above. After sending, please contact Nexxen support with the receipt
+                          Send funds to the address above. After sending, please contact {brandName} support with the receipt
                           & username for verification.
                         </p>
                       </div>

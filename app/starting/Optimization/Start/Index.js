@@ -8,13 +8,23 @@ import Image from "next/image"
 import { useUsersContext } from "@/app/AllContext/UsersContext"
 import { Dialog } from "@/components/ui/dialog"
 import CS from "@/app/Common/CustomerService/CS"
-import SupportChat from '@/app/Common/SupportChat/SupportChat'
+import { fetchAdminSettings, DEFAULT_SETTINGS } from "@/lib/admin-settings"
 
 const Index = ({ user, setShowTaskSubmissionDialog, setTask, starting, setStarting, tasksState, setTasksState }) => {
   const { fetchOptimizationProducts, fetchTasks, getTaskForUser, setUser } = useUsersContext()
   const [shuffled, setShuffled] = useState([])
   const [showCSModal, setShowCSModal] = useState(false)
   const [csMessage, setCSMessage] = useState("")
+  const [workingHours, setWorkingHours] = useState(DEFAULT_SETTINGS.workingHours)
+  const [completedSets, setCompletedSets] = useState({ today: 0, total: 0 })
+  useEffect(() => {
+    if (!user?._id) return
+    fetch(`https://platform-axon-rust.vercel.app/api/combo/completed-sets/${user._id}`)
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setCompletedSets({ today: d.today || 0, total: d.total || 0 }) })
+      .catch(() => {})
+  }, [user?._id, tasksState])
+  useEffect(() => { fetchAdminSettings().then((s) => setWorkingHours(s.workingHours || DEFAULT_SETTINGS.workingHours)) }, [])
 
   const fetchTasksAndSetState = async () => {
     if (!user?._id) return
@@ -35,25 +45,18 @@ const Index = ({ user, setShowTaskSubmissionDialog, setTask, starting, setStarti
     return newArr
   }
 
+  // Working hours are admin-controlled (Req 12). When disabled, the
+  // platform is available 24 hours; otherwise the admin-set window in
+  // the configured timezone applies (defaults: 09:30-21:30 Eastern).
   const isWithinEasternWorkingHours = () => {
+    if (!workingHours?.enabled) return true
     const now = new Date()
-
-    // Convert current time to America/New_York timezone
     const easternTimeString = now.toLocaleString("en-US", {
-      timeZone: "America/New_York",
+      timeZone: workingHours.timezone || "America/New_York",
     })
-
     const easternTime = new Date(easternTimeString)
-
-    const hours = easternTime.getHours()
-    const minutes = easternTime.getMinutes()
-
-    const totalMinutes = hours * 60 + minutes
-
-    const startMinutes = 9 * 60 + 30   // 09:30 AM
-    const endMinutes = 21 * 60 + 30    // 09:30 PM
-
-    return totalMinutes >= startMinutes && totalMinutes <= endMinutes
+    const totalMinutes = easternTime.getHours() * 60 + easternTime.getMinutes()
+    return totalMinutes >= (workingHours.startMinutes ?? 570) && totalMinutes <= (workingHours.endMinutes ?? 1290)
   }
 
   const handleStartOptimization = async () => {
@@ -61,7 +64,7 @@ const Index = ({ user, setShowTaskSubmissionDialog, setTask, starting, setStarti
 
     // ✅ Working hours check
     if (!isWithinEasternWorkingHours()) {
-      setCSMessage("Platform working hours are from 09:30AM to 09:30PM Eastern Time")
+      setCSMessage(`Platform working hours are from ${workingHours.startLabel} to ${workingHours.endLabel} Eastern Time`)
       setShowCSModal(true)
       return
     }
@@ -73,6 +76,9 @@ const Index = ({ user, setShowTaskSubmissionDialog, setTask, starting, setStarti
       return
     }
 
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("axon-activity", { detail: { activity: "Starting optimization" } }))
+    }
     setStarting(true)
 
     const totalTasks =
@@ -139,7 +145,6 @@ const Index = ({ user, setShowTaskSubmissionDialog, setTask, starting, setStarti
 
   return (
     <>
-      <SupportChat userId={user._id} username={user.username} />
       <div className="w-full">
         <Card className="relative p-4 lg:p-6 bg-[#3d4f3f] shadow-2xl border border-[#a3d65c]/30 rounded-3xl overflow-hidden backdrop-blur-xl">
           <div className="absolute inset-0 bg-gradient-to-br from-[#a3d65c]/5 to-transparent"></div>
@@ -166,7 +171,7 @@ const Index = ({ user, setShowTaskSubmissionDialog, setTask, starting, setStarti
                   <div className="p-2.5 rounded-lg bg-gradient-to-r from-[#a3d65c] to-[#8bc34a] shadow-sm">
                     <LucideIcons.Target className="h-5 w-5 text-[#2d3e2f]" />
                   </div>
-                  <span className="text-sm lg:text-base font-semibold text-white">Task Progress</span>
+                  <span className="text-sm lg:text-base font-semibold text-white">Activity Progress</span>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -183,6 +188,9 @@ const Index = ({ user, setShowTaskSubmissionDialog, setTask, starting, setStarti
                   className="h-full bg-gradient-to-r from-[#a3d65c] to-[#8bc34a] rounded-full transition-all duration-500"
                   style={{ width: `${(tasksState / totalTasks) * 100}%` }}
                 ></div>
+              </div>
+              <div className="mt-4 flex items-center gap-6 text-sm">
+                <span className="text-gray-300">Sets Completed Today: <span className="font-bold text-[#a3d65c]">{completedSets.today}</span></span>
               </div>
             </div>
 

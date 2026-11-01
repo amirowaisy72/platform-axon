@@ -9,9 +9,12 @@ import { useRouter } from "next/navigation"
 import Bottom from "@/app/Common/Bottom/Bottom"
 import CS from "@/app/Common/CustomerService/CS"
 import SupportChat from '@/app/Common/SupportChat/SupportChat'
+import NotificationPopup from "@/app/Common/Notifications/NotificationPopup"
+import { fetchAdminSettings, DEFAULT_SETTINGS } from "@/lib/admin-settings"
 
 export default function HomePage() {
   const [showNotifications, setShowNotifications] = useState(false)
+  const [popupNotification, setPopupNotification] = useState(null)
   const router = useRouter()
   const [storedUser, setStoredUser] = useState(null)
 
@@ -20,9 +23,60 @@ export default function HomePage() {
     if (!userData) {
       router.push("/login")
     } else {
-      setStoredUser(JSON.parse(userData))
+      const parsed = JSON.parse(userData)
+      setStoredUser(parsed)
+      // Fresh copy from the backend, so new notifications appear without re-login.
+      fetch(`https://platform-axon-rust.vercel.app/api/users/getUser/${parsed._id}`)
+        .then((r) => r.json())
+        .then((result) => {
+          if (result?.user) {
+            setStoredUser(result.user)
+            localStorage.setItem("user", JSON.stringify(result.user))
+          }
+        })
+        .catch(() => {})
     }
   }, [])
+
+  // Unread = backend read flag. The bell dot shows ONLY when this is > 0.
+  const unreadCount = (storedUser?.notifications || []).filter((n) => !n.read).length
+
+  const markNotificationsRead = () => {
+    if (!storedUser || unreadCount === 0) return
+    const updated = {
+      ...storedUser,
+      notifications: (storedUser.notifications || []).map((n) => ({ ...n, read: true })),
+    }
+    setStoredUser(updated)
+    localStorage.setItem("user", JSON.stringify(updated))
+    fetch(`https://platform-axon-rust.vercel.app/api/users/markNotificationsRead/${storedUser._id}`, { method: "POST" }).catch(() => {})
+  }
+
+  const handleBellClick = () => {
+    const opening = !showNotifications
+    setShowNotifications(opening)
+    if (opening) {
+      setPopupNotification(null)
+      markNotificationsRead()
+    }
+  }
+
+  // First-time popup: the newest unread notification never shown before.
+  // "Shown" is tracked separately from "read": dismissing the popup does
+  // not clear the bell dot; only opening the dropdown does.
+  useEffect(() => {
+    if (!storedUser?.notifications?.length || showNotifications || popupNotification) return
+    try {
+      const shown = new Set(JSON.parse(localStorage.getItem("axon-shown-notification-ids") || "[]"))
+      const fresh = [...storedUser.notifications].reverse().find((n) => !n.read && !shown.has(n._id || `${n.message}-${n.createdAt}`))
+      if (!fresh) return
+      const key = fresh._id || `${fresh.message}-${fresh.createdAt}`
+      shown.add(key)
+      localStorage.setItem("axon-shown-notification-ids", JSON.stringify([...shown]))
+      const timer = setTimeout(() => setPopupNotification(fresh), 600)
+      return () => clearTimeout(timer)
+    } catch (e) { /* ignore */ }
+  }, [storedUser, showNotifications, popupNotification])
 
   const navTabs = [
     { name: "Service", iconName: "Briefcase", href: "#", color: "from-lime-500 to-lime-600" },
@@ -35,7 +89,7 @@ export default function HomePage() {
     { name: "About", iconName: "Info", href: "/about", color: "from-lime-500 to-lime-600" },
   ]
 
-  const vipLevels = [
+  const defaultVipLevels = [
     {
       level: "VIP1",
       amount: "1000.00 USD",
@@ -66,11 +120,30 @@ export default function HomePage() {
     },
   ]
 
+  const [vipLevels, setVipLevels] = useState(defaultVipLevels)
+  const [brandName, setBrandName] = useState(DEFAULT_SETTINGS.brandName)
+  const [workingHours, setWorkingHours] = useState(DEFAULT_SETTINGS.workingHours)
+  useEffect(() => {
+    fetchAdminSettings().then((s) => {
+      if (s.brandName) setBrandName(s.brandName)
+      if (s.workingHours) setWorkingHours(s.workingHours)
+      const configured = (s.vipLevels || []).filter((v) => v.visible !== false)
+      if (configured.length > 0) {
+        setVipLevels(configured.map((v) => ({
+          level: v.level,
+          amount: v.amount || `${Number(v.depositRequired || 0).toLocaleString()}.00 USD`,
+          iconName: v.iconName || "Star",
+          color: "from-lime-500 to-lime-600",
+          bgColor: "bg-gradient-to-br from-lime-900/20 to-lime-800/20",
+        })))
+      }
+    })
+  }, [])
+
   if (!storedUser) return null
 
   return (
     <>
-      <SupportChat userId={storedUser._id} username={storedUser.username} />
       <div className="flex flex-col min-h-screen bg-[#2d3e2f]">
         {/* Header */}
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#2d3e2f]/95 border-b border-[#3d4e3f] shadow-lg">
@@ -79,7 +152,7 @@ export default function HomePage() {
               <div className="w-10 h-10 rounded-xl bg-lime-500 flex items-center justify-center shadow-lg">
                 <LucideIcons.Zap className="h-6 w-6 text-[#2d3e2f]" />
               </div>
-              <h1 className="text-2xl font-bold text-white tracking-wide">Axon</h1>
+              <h1 className="text-2xl font-bold text-white tracking-wide">{brandName}</h1>
             </Link>
 
             <div className="flex items-center gap-3 relative">
@@ -87,17 +160,21 @@ export default function HomePage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={handleBellClick}
+                title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}` : "Notifications"}
                 className="relative text-gray-300 hover:text-lime-400 transition-colors rounded-xl hover:bg-[#3d4e3f]"
               >
                 <LucideIcons.Bell className="h-6 w-6" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-lime-500 rounded-full animate-pulse"></div>
+                {unreadCount > 0 && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-lime-500 rounded-full animate-pulse"></div>
+                )}
               </Button>
 
               {/* 💬 Chat Icon */}
               <SupportChat
                 userId={storedUser._id}
                 username={storedUser.username}
+                renderPanel={false}
                 renderTrigger={({ unseenCount, openChat }) => (
                   <button
                     onClick={openChat}
@@ -118,19 +195,27 @@ export default function HomePage() {
               {/* 👤 Profile */}
               <Link
                 href="/profile"
-                className="text-gray-300 hover:text-lime-400 transition-colors rounded-xl hover:bg-[#3d4e3f] p-2"
+                className="text-gray-300 hover:text-lime-400 transition-colors rounded-xl hover:bg-[#3d4e3f] p-1"
+                title="Profile"
               >
-                <LucideIcons.UserCircle className="h-6 w-6" />
+                {(storedUser.profile?.photoLink || (storedUser.profileimage && storedUser.profileimage !== "none" ? storedUser.profileimage : "")) ? (
+                  <img src={storedUser.profile?.photoLink || storedUser.profileimage} alt={storedUser.username} className="w-8 h-8 rounded-full object-cover border border-lime-500/50" />
+                ) : (
+                  <LucideIcons.UserCircle className="h-6 w-6" />
+                )}
               </Link>
 
               {/* 🔽 Notification Dropdown */}
               {showNotifications && (
                 <Card className="absolute top-full right-0 mt-3 w-80 bg-[#3d4e3f]/95 backdrop-blur-xl border border-[#4d5e4f] shadow-2xl rounded-2xl z-50 overflow-hidden">
-                  <div className="bg-lime-500 p-4">
+                  <div className="bg-lime-500 p-4 flex items-center justify-between">
                     <h3 className="text-lg font-bold text-[#2d3e2f] flex items-center gap-2">
                       <LucideIcons.Bell className="h-5 w-5" />
                       Notifications
                     </h3>
+                    <span className="text-xs font-bold text-[#2d3e2f]/70">
+                      {unreadCount > 0 ? `${unreadCount} unread` : "All read"}
+                    </span>
                   </div>
                   <div className="p-4">
                     {storedUser.notifications.length > 0 ? (
@@ -162,10 +247,13 @@ export default function HomePage() {
 
                           return (
                             <li
-                              key={index}
+                              key={notification._id || index}
                               className={`text-sm p-3 rounded-xl ${bgColor} border hover:bg-[#2d3e2f] transition-all duration-200 ${textColor}`}
                             >
-                              <p>{notification.message}</p>
+                              <p className="flex items-start gap-2">
+                                {!notification.read && <span className="mt-1.5 w-2 h-2 bg-lime-400 rounded-full shrink-0" title="Unread" />}
+                                <span className={!notification.read ? "font-semibold text-white" : ""}>{notification.message}</span>
+                              </p>
                               <p className="text-xs opacity-50 mt-1">
                                 {new Date(notification.createdAt).toLocaleString()}
                               </p>
@@ -378,7 +466,7 @@ export default function HomePage() {
                   <div className="w-16 h-16 bg-lime-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <LucideIcons.Users className="h-8 w-8 text-[#2d3e2f]" />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">08:00 AM to 08:00 PM EST</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">{workingHours?.enabled ? `${workingHours.startLabel} to ${workingHours.endLabel} EST` : "Available 24 Hours"}</h3>
                   <p className="text-gray-300">Round-the-clock customer support team</p>
                 </div>
               </div>
@@ -401,6 +489,14 @@ export default function HomePage() {
 
         <Bottom />
       </div>
+      {popupNotification && !showNotifications && (
+        <NotificationPopup
+          notification={popupNotification}
+          unreadCount={unreadCount}
+          onView={handleBellClick}
+          onDismiss={() => setPopupNotification(null)}
+        />
+      )}
     </>
   )
 }

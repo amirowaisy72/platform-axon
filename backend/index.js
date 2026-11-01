@@ -30,6 +30,7 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }))
 app.use("/api/users", require("./routes/users"))
 app.use("/api/products", require("./routes/products"))
 app.use("/api/combo", require("./routes/combo"))
+app.use("/api/settings", require("./routes/settings"))
 
 // =======================
 // 🚀 START SERVER

@@ -7,12 +7,27 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import * as LucideIcons from "lucide-react"
 import { useChatContext } from "@/app/AllContext/ChatContext"
+import { useDashboard } from "@/app/AllContext/DashboardContext"
 import { optimizeImage, validateImageFile, getBase64Size } from "@/lib/image-optimizer"
 
 export default function LiveChat() {
-    const { messages, sendMessage, fetchChatHistory, users, killChat, sendTypingStatus, typingStatus, markMessagesAsRead } = useChatContext()
+    const { messages, sendMessage, fetchChatHistory, users, setUsers, killChat, sendTypingStatus, typingStatus, markMessagesAsRead, selectedUser: contextSelectedUser, setSelectedUser: setContextSelectedUser } = useChatContext()
+    const { onlineUsers, realtimeEnabled } = useDashboard()
+    const onlineIds = new Set((onlineUsers || []).map((u) => String(u._id)))
+    const isUserOnline = (id) => realtimeEnabled && onlineIds.has(String(id))
 
+    // Req 2: a user opened from Users Management arrives here via
+    // ChatContext, so admin can send the first message to a user who
+    // has never chatted before.
     const [selectedUser, setSelectedUser] = useState(null)
+    useEffect(() => {
+      if (contextSelectedUser) {
+        setSelectedUser(contextSelectedUser)
+        if (!users.some((u) => u.id === contextSelectedUser.id)) {
+          setUsers((prev) => [{ id: contextSelectedUser.id, username: contextSelectedUser.username, lastMessage: "", timestamp: Date.now(), pendingMessages: 0 }, ...prev])
+        }
+      }
+    }, [contextSelectedUser])
     const [messageText, setMessageText] = useState("")
     const [replyingTo, setReplyingTo] = useState(null)
     const [isOptimizing, setIsOptimizing] = useState(false)
@@ -240,7 +255,7 @@ export default function LiveChat() {
                                     ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 border-cyan-500/50"
                                     : "bg-slate-800/40 hover:bg-slate-800/60 border-2 border-transparent"
                                     }`}
-                                onClick={() => setSelectedUser(user)}
+                                onClick={() => { setSelectedUser(user); setContextSelectedUser(user) }}
                             >
                                 <div className="flex items-start gap-3">
                                     {/* Avatar */}
@@ -248,6 +263,9 @@ export default function LiveChat() {
                                         <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
                                             {user.username.charAt(0)}
                                         </div>
+                                        {isUserOnline(user.id) && (
+                                            <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-slate-900" title="Online now" />
+                                        )}
                                         {user.pendingMessages > 0 && (
                                             <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white animate-pulse">
                                                 {user.pendingMessages}
@@ -293,6 +311,12 @@ export default function LiveChat() {
                         <div>
                             <h3 className="text-lg font-bold text-slate-100">{selectedUser.username}</h3>
                             <p className="text-xs text-slate-400">User ID: {selectedUser.id}</p>
+                            {realtimeEnabled && (
+                                <p className="text-xs mt-1 flex items-center gap-1.5">
+                                    <span className={`h-2.5 w-2.5 rounded-full ${isUserOnline(selectedUser.id) ? "bg-green-500" : "bg-slate-500"}`} />
+                                    <span className={isUserOnline(selectedUser.id) ? "text-green-400 font-semibold" : "text-slate-400"}>{isUserOnline(selectedUser.id) ? "Online now" : "Offline"}</span>
+                                </p>
+                            )}
                         </div>
                         <Button variant="destructive" size="sm" onClick={(e) => handleKillChat(selectedUser.id, e)}>
                             <LucideIcons.Trash2 className="h-4 w-4 mr-2" />

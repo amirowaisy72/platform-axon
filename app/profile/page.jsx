@@ -10,7 +10,6 @@ import { useUsersContext } from "../AllContext/UsersContext"
 import { useRouter } from "next/navigation"
 import Bottom from "@/app/Common/Bottom/Bottom"
 import CS from "@/app/Common/CustomerService/CS"
-import SupportChat from "@/app/Common/SupportChat/SupportChat"
 
 export default function ProfilePage() {
   const { logout } = useUsersContext()
@@ -63,22 +62,33 @@ export default function ProfilePage() {
     }
   }, [router])
 
-  const handleProfileImageUpload = (e) => {
+  // Profile picture via Cloudinary (Req 8): the file is uploaded to
+  // Cloudinary through the backend, and only the returned URL is saved
+  // on the user. It is therefore visible from any browser/device and
+  // in the admin panel, not just the browser where it was set.
+  const handleProfileImageUpload = async (e) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const base64String = reader.result
-        if (storedUser) {
-          const userData = JSON.parse(storedUser)
-          userData.profile = userData.profile || {}
-          userData.profile.photoLink = base64String
-          localStorage.setItem("user", JSON.stringify(userData))
-          setProfilePhotoLink(base64String)
-        }
+    if (!file || !storedUser) return
+    const userData = JSON.parse(storedUser)
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      try {
+        const response = await fetch("https://platform-axon-rust.vercel.app/api/users/uploadProfileImage/" + userData._id, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: reader.result }),
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || "Upload failed")
+        userData.profile = userData.profile || {}
+        userData.profile.photoLink = result.photoLink
+        localStorage.setItem("user", JSON.stringify(userData))
+        setProfilePhotoLink(result.photoLink)
+      } catch (error) {
+        alert(error.message || "Failed to upload profile picture. Ask an admin to configure Cloudinary in Admin Settings.")
       }
-      reader.readAsDataURL(file)
     }
+    reader.readAsDataURL(file)
   }
 
   const financialFeatures = [
@@ -152,7 +162,6 @@ export default function ProfilePage() {
 
   return (
     <>
-      <SupportChat userId={user.userId} username={user.name} />
       <div className="flex flex-col min-h-screen bg-[#2d3e2f]">
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#3a4d3c]/80 border-b border-[#a3d65c]/20 shadow-lg">
           <div className="flex items-center justify-between p-4">

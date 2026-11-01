@@ -171,11 +171,23 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Forgot Password Link */}
+                {/* Forgot Password Link (Req 4) */}
+                {/* Clicking this opens support: the user is told to contact
+                    support, share their account number, and support will
+                    reset their account password. */}
                 <div className="text-right">
-                  <Link href="#" className="text-[#a3d65c] hover:text-[#b5e77d] font-medium text-sm transition-colors">
-                    Forgot Password?
-                  </Link>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button type="button" className="text-[#a3d65c] hover:text-[#b5e77d] font-medium text-sm transition-colors">
+                        Forgot Password?
+                      </button>
+                    </DialogTrigger>
+                    <CS
+                      userId={generateUserId()}
+                      username="Anonymous User"
+                      message="To reset your password, please contact support, tell support your account number, and support will reset your account password."
+                    />
+                  </Dialog>
                 </div>
 
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}

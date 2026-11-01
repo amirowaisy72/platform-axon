@@ -27,6 +27,19 @@ const leadSchema = new mongoose.Schema(
       identifier: { type: String, default: "" },
     },
 
+    // Location derived from the user's IP (Req 9). Display only; the IP
+    // itself is kept so a stale lookup can be refreshed on next login.
+    location: {
+      ip: { type: String, default: "" },
+      country: { type: String, default: "" },
+      city: { type: String, default: "" },
+      region: { type: String, default: "" },
+      updatedAt: { type: Date, default: null },
+      // Admin-set: when true, the next presence heartbeat fetches a fresh
+      // location even if one is already saved, then clears this flag.
+      refreshRequested: { type: Boolean, default: false },
+    },
+
     walletBalance: { type: Number, default: 25 },
     totalBalance: { type: Number, default: 25 },
     commissionTotal: { type: Number, default: 0 },
@@ -48,6 +61,12 @@ const leadSchema = new mongoose.Schema(
     ],
 
     allowWithdrawal: { type: Boolean, default: false },
+
+    // Realtime presence (updated by heartbeat, never by a user save).
+    // Online = lastSeenAt within the last 2 minutes.
+    lastSeenAt: { type: Date, default: null },
+    currentPage: { type: String, default: "" },
+    currentActivity: { type: String, default: "" },
   },
   { timestamps: true }
 );
@@ -55,7 +74,7 @@ const leadSchema = new mongoose.Schema(
 /* -------------------------------------------
    AUTO UPDATE VIP LEVEL BEFORE SAVE
 -------------------------------------------- */
-leadSchema.pre("save", function (next) {
+leadSchema.pre("save", async function (next) {
   const vip = this.currentVIPLevel;
 
   const vipSettings = {
@@ -64,6 +83,30 @@ leadSchema.pre("save", function (next) {
     3: { name: "Gold Tier", withdraw_limit: 8000, commission: 0.8 },
     4: { name: "Diamond Tier", withdraw_limit: Infinity, commission: 1 },
   };
+
+  // Admin-configured VIP levels (Req 11) take precedence when present.
+  // Defaults above are unchanged, so a fresh install behaves exactly as before.
+  try {
+    const AdminSettings = require("./AdminSettings");
+    const adminSettings = await AdminSettings.findOne({ key: "global" }).lean();
+    const configured = (adminSettings?.vipLevels || []).find(
+      (level) => Number(String(level.level).replace(/[^0-9]/g, "")) === vip.number
+    );
+    if (configured) {
+      if (configured.name) vip.name = configured.name;
+      const commission = parseFloat(String(configured.commission).replace("%", ""));
+      if (!Number.isNaN(commission)) vip.commission = commission;
+      const limit = String(configured.withdrawalLimit || "").toLowerCase();
+      if (limit === "unlimited") vip.withdraw_limit = Infinity;
+      else {
+        const parsed = parseFloat(limit.replace(/[^0-9.]/g, ""));
+        if (!Number.isNaN(parsed)) vip.withdraw_limit = parsed;
+      }
+      return next();
+    }
+  } catch (e) {
+    // Fall through to the built-in defaults if settings cannot be read.
+  }
 
   const settings = vipSettings[vip.number];
 

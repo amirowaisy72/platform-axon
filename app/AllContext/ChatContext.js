@@ -7,8 +7,8 @@ const LiveSupportContext = createContext(undefined)
 export function LiveSupportProvider({ children }) {
   const host1offline = "http://localhost:3001/"
   const host2offline = "http://localhost:8000/"
-  const host1online = "https://platform-axon-backend.vercel.app/"
-  const host2online = "https://platform-axon-live-server.onrender.com/"
+  const host1online = "https://platform-axon-rust.vercel.app/"
+  const host2online = "https://platform-axon-realtime.onrender.com/"
   const [messages, setMessages] = useState([])
   const [isConnected, setIsConnected] = useState(false)
   const [typingStatus, setTypingStatus] = useState({})
@@ -48,7 +48,13 @@ export function LiveSupportProvider({ children }) {
 
           case "new_message":
             setMessages((prev) => [...prev, data.payload])
-            if (data.payload.sender === "support" && isChatOpen) {
+            // Auto-open: when admin (support) sends a live message, open
+            // the chat window automatically, on whichever page the user
+            // is on. Setting true when already open is a no-op. This is
+            // only for live new_message events, not for history loaded
+            // on page load, so old unread messages do not pop open.
+            if (data.payload.sender === "support") {
+              setIsChatOpen(true)
               setTimeout(() => {
                 markMessagesAsRead([data.payload.id])
               }, 1000)

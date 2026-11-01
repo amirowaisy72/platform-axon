@@ -140,6 +140,10 @@ export default function SignupPage() {
       newErrors.gender = "Please select your gender"
     }
 
+    if (!formData.inviteCode.trim()) {
+      newErrors.inviteCode = "Invite code is required"
+    }
+
     if (!formData.agreeToTerms) {
       newErrors.agreeToTerms = "You must agree to the terms and conditions"
     }
@@ -407,7 +411,7 @@ export default function SignupPage() {
               <div className="space-y-2">
                 <Label htmlFor="inviteCode" className="text-white font-semibold flex items-center gap-2">
                   <LucideIcons.Gift className="h-4 w-4" />
-                  Invite Code (Optional)
+                  Invite Code *
                 </Label>
                 <div className="relative">
                   <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
@@ -417,12 +421,13 @@ export default function SignupPage() {
                     id="inviteCode"
                     name="inviteCode"
                     type="text"
-                    placeholder="Enter invite code if you have one"
+                    placeholder="Enter invite code"
                     value={formData.inviteCode}
                     onChange={handleInputChange}
                     className="pl-12 h-12 text-base bg-[#2d3e2f]/80 border-2 border-[#a3d65c]/30 rounded-xl focus:border-[#a3d65c] focus:ring-4 focus:ring-[#a3d65c]/20 transition-all text-white placeholder:text-white/40"
                   />
                 </div>
+                {errors.inviteCode && <p className="text-red-400 text-sm">{errors.inviteCode}</p>}
               </div>
 
               <div className="space-y-2">

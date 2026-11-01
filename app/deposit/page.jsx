@@ -8,7 +8,6 @@ import Bottom from "@/app/Common/Bottom/Bottom"
 import CS from "@/app/Common/CustomerService/CS"
 import { useRouter } from "next/navigation"
 import Deposit from "./deposit/Index"
-import SupportChat from '@/app/Common/SupportChat/SupportChat'
 import TransactionHistory from "@/app/withdrawal/history/Index"
 
 export default function DepositPage() {
@@ -30,7 +29,6 @@ export default function DepositPage() {
 
   return (
     <>
-    <SupportChat userId={storedUser._id} username={storedUser.username} />
       <div className="flex flex-col min-h-screen bg-gradient-to-br from-[#2d3e2f] via-[#3a4d3c] to-[#2d3e2f]">
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#2d3e2f]/90 border-b border-[#a3d65c]/20 shadow-lg">
           <div className="flex items-center justify-between p-4">
